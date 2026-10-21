@@ -10,7 +10,8 @@ network node, participating in the Erlang cluster.
 
 ## Features
 
-*   Erlang distribution protocol for Erlang versions 19 to 25
+*   Erlang distribution protocol targeting Erlang/OTP 26 and newer;
+    older releases are no longer supported
 *   Registry of Python 'processes', which have an Erlang-compatible process
     identifier and an optional registered name
 *   Send and receive messages locally and remotely by pid or name

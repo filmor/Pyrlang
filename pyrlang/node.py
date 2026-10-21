@@ -122,7 +122,7 @@ class Node:
         # future object we're awaiting when running the loop for the node
         self.__completed_future: asyncio.Future[bool] = self._event_loop.create_future()
 
-        self._prev_unlink_identifier = -1
+        self._prev_unlink_identifier = 0
 
     async def _async_loop(self) -> None:
         # This is important before we can begin spawning processes
@@ -433,8 +433,7 @@ class Node:
         :type from_pid: term.pid.Pid
         :param to_pid: Second pid
         :type to_pid: term.pid.Pid
-        :param local_only: If set to True, linking to remote pids will send
-            UNLINK message over dist_proto protocol
+        :param local_only: Retained for API compatibility.
         """
 
         if from_pid.is_local_to(self) and to_pid.is_local_to(self):
@@ -450,7 +449,7 @@ class Node:
 
             return
 
-        if to_pid.is_local_to(self):  # inbound old-protocol message
+        if to_pid.is_local_to(self):
             if to_pid not in self.processes_:
                 return
 
@@ -459,7 +458,6 @@ class Node:
 
             return
 
-        # otherwise, this is an outbound request. start by performing protocol selection
         await self._establish_connection(to_pid.node_name_)
         conn = self.dist_nodes_.get(to_pid.node_name_, None)
         if conn is None:
@@ -469,23 +467,15 @@ class Node:
         if from_pid not in self.processes_:
             return
         from_process = self.processes_[from_pid]
-        if from_process._link_state(to_pid) != True:
+        if from_process._link_state(to_pid) is not True:
             return
 
-        from .dist_proto.flags import DFLAG_UNLINK_ID
-
-        if conn.peer_flags_ & DFLAG_UNLINK_ID == 0:  # old protocol
-            from_process._set_link_state(to_pid, None)
-            return await self.dist_command(
-                to_pid.node_name_, ("unlink", from_pid, to_pid)
-            )
-        else:  # new protocol
-            self._prev_unlink_identifier += 1
-            identifier = self._prev_unlink_identifier
-            from_process._set_link_state(to_pid, identifier)  # set to "unlinking"
-            return await self.dist_command(
-                to_pid.node_name_, ("unlink_id", identifier, from_pid, to_pid)
-            )
+        self._prev_unlink_identifier += 1
+        identifier = self._prev_unlink_identifier
+        from_process._set_link_state(to_pid, identifier)  # set to "unlinking"
+        return await self.dist_command(
+            to_pid.node_name_, ("unlink_id", identifier, from_pid, to_pid)
+        )
 
     async def _unlink_id(self, identifier: int, from_pid: Pid, to_pid: Pid) -> None:
         """Services an UNLINK_ID message arriving over distribution.
@@ -499,7 +489,7 @@ class Node:
         if to_pid not in self.processes_:
             return
         to_process = self.processes_[to_pid]
-        if to_process._link_state(from_pid) == True:
+        if to_process._link_state(from_pid) is True:
             to_process._set_link_state(from_pid, None)
 
         # NOTE: to_pid / from_pid are deliberately swapped in the response
@@ -513,7 +503,8 @@ class Node:
         if to_pid not in self.processes_:
             return
         to_process = self.processes_[to_pid]
-        if to_process._link_state(from_pid) == identifier:
+        state = to_process._link_state(from_pid)
+        if state is not True and state == identifier:
             to_process._set_link_state(from_pid, None)
 
     def monitor_process(

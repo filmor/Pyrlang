@@ -29,6 +29,11 @@ from term.basetypes import Term
 from term.pid import Pid
 from term.reference import Reference
 
+from pyrlang.dist_proto.flags import (
+    DFLAG_MANDATORY_25_DIGEST,
+    MANDATORY_DFLAGS,
+    MANDATORY_DFLAGS_25,
+)
 from pyrlang.errors import DistributionError
 from pyrlang.node_db import NodeDB
 
@@ -43,7 +48,6 @@ if TYPE_CHECKING:
 CONTROL_TERM_LINK = 1
 CONTROL_TERM_SEND = 2
 CONTROL_TERM_EXIT = 3
-CONTROL_TERM_UNLINK = 4  # TODO
 
 CONTROL_TERM_NODE_LINK = 5  # Deprecated, can be later reused by BEAM VM
 
@@ -116,10 +120,7 @@ class BaseDistProtocol(asyncio.Protocol):
         """ Inbox is used to ask the connection to do something. """
 
         self.dist_vsn_: int | None = None
-        """ Protocol version range supported by the remote peer and us.
-            Erlang/OTP since R6B supports protocol version 5.
-            In OTP-23 protocol version 6 was added as optional,
-            which became mandatory in OTP-25. """
+        """ Negotiated distribution version (6 for OTP 26+). """
 
         self.peer_flags_ = 0
         self.peer_name_: str | None = None
@@ -137,6 +138,17 @@ class BaseDistProtocol(asyncio.Protocol):
         if self.transport_ is not None:
             self.transport_.close()
             self.transport_ = None
+
+    def _set_peer_flags(self, flags: int) -> None:
+        if flags & DFLAG_MANDATORY_25_DIGEST:
+            flags |= MANDATORY_DFLAGS_25
+        missing = MANDATORY_DFLAGS & ~flags
+        if missing:
+            self.destroy()
+            self.raise_protocol_error(
+                f"Peer lacks mandatory OTP 26 capabilities: {missing:#x}"
+            )
+        self.peer_flags_ = flags
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         """Connection has been accepted and established (callback)."""
@@ -256,10 +268,6 @@ class BaseDistProtocol(asyncio.Protocol):
             (_, from_pid, to_pid) = control_term
             return await n.link(from_pid, to_pid, local_only=True)
 
-        elif ctrl_msg_type == CONTROL_TERM_UNLINK:
-            (_, from_pid, to_pid) = control_term
-            return await n.unlink(from_pid, to_pid, local_only=True)
-
         elif ctrl_msg_type == CONTROL_TERM_UNLINK_ID:
             (_, identifier, from_pid, to_pid) = control_term
             return await n._unlink_id(identifier, from_pid, to_pid)
@@ -369,12 +377,6 @@ class BaseDistProtocol(asyncio.Protocol):
             (_, pid1, pid2) = m
             ctrl = (CONTROL_TERM_LINK, pid1, pid2)
             LOG.info("Sending link %s <-> %s", pid1, pid2)
-            return self._control_message(ctrl, None)
-
-        elif m[0] == "unlink":
-            (_, pid1, pid2) = m
-            ctrl = (CONTROL_TERM_UNLINK, pid1, pid2)
-            LOG.info("Sending unlink %s <-> %s", pid1, pid2)
             return self._control_message(ctrl, None)
 
         elif m[0] == "unlink_id":

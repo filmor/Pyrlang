@@ -35,6 +35,8 @@ class DistClientProtocol(BaseDistProtocol):
 
     def __init__(self, node_name: str, dist_vsn: int) -> None:
         super().__init__(node_name=node_name)
+        if not version.check_valid_dist_version(dist_vsn):
+            self.raise_protocol_error(f"Unsupported distribution version: {dist_vsn}")
         self.dist_vsn_ = dist_vsn
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
@@ -68,28 +70,17 @@ class DistClientProtocol(BaseDistProtocol):
     def _send_name(self) -> None:
         """Create and send first welcome packet."""
 
-        if self.dist_vsn_ == 5:
-            pkt = (
-                b"n"
-                + bytes(version.DIST_VSN_PAIR)
-                + util.to_u32(self.get_node().node_opts_.dflags_)
-                + bytes(self.node_name_, "latin-1")
-            )
-            LOG.info("send_name %s (name=%s)", pkt, self.node_name_)
-            self._send_packet2(pkt)
-
-        elif self.dist_vsn_ == 6:
-            n = self.get_node()
-            name = bytes(self.node_name_, "latin-1")
-            pkt = (
-                b"N"
-                + struct.pack(">Q", self.get_node().node_opts_.dflags_)
-                + util.to_u32(n.dist_.creation_)
-                + util.to_u16(len(name))
-                + name
-            )
-            LOG.info("send_name %s (name=%s)", pkt, self.node_name_)
-            self._send_packet2(pkt)
+        n = self.get_node()
+        name = self.node_name_.encode("utf-8")
+        pkt = (
+            b"N"
+            + struct.pack(">Q", n.node_opts_.dflags_)
+            + util.to_u32(n.dist_.creation_)
+            + util.to_u16(len(name))
+            + name
+        )
+        LOG.info("send_name %s (name=%s)", pkt, self.node_name_)
+        self._send_packet2(pkt)
 
     def on_packet_recvstatus(self, data: bytes) -> bytes:
         if chr(data[0]) != "s":
@@ -119,34 +110,17 @@ class DistClientProtocol(BaseDistProtocol):
         return self.raise_protocol_error("Duplicate connection denied")
 
     def on_packet_recvchallenge(self, data: bytes) -> bytes:
-        if chr(data[0]) == "n":  # (version 5)
-            # It seems that the peer in (data[1], data[2]) sends back our max/min version,
-            # and not its own max/min version (checked with OTP-22).
-            # Not a problem because we already determined what version to use (dist_vsn_),
-            # and moreover in version 6 of the message the versions are not conveyed at all.
-            self.peer_flags_ = util.u32(data, 3)
-            challenge = util.u32(data, 7)
-            self.peer_name_ = data[11:].decode("latin1")
+        if not data.startswith(b"N"):
+            self.destroy()
+            return self.raise_protocol_error("Handshake 'N' packet expected (OTP 26+)")
 
-            self._send_challenge_reply(challenge)
-
-            self.state_ = self.RECV_CHALLENGE_ACK
-            return b""  # assume everything is consumed?
-
-        elif chr(data[0]) == "N":  # (version 6)
-            self.peer_flags_ = struct.unpack(">Q", data[1:9])[0]
-            challenge = util.u32(data[9:13])
-            util.u32(data[13:17])
-            nlen = util.u16(data[17:19])
-            self.peer_name_ = data[19 : 19 + nlen].decode("latin1")
-
-            self._send_challenge_reply(challenge)
-
-            self.state_ = self.RECV_CHALLENGE_ACK
-            return b""  # assume everything is consumed?
-
-        else:
-            return self.raise_protocol_error("Handshake 'n' or 'N' packet expected")
+        self._set_peer_flags(struct.unpack(">Q", data[1:9])[0])
+        challenge = util.u32(data[9:13])
+        nlen = util.u16(data[17:19])
+        self.peer_name_ = data[19 : 19 + nlen].decode("utf-8")
+        self._send_challenge_reply(challenge)
+        self.state_ = self.RECV_CHALLENGE_ACK
+        return b""
 
     def _send_challenge_reply(self, challenge: int) -> None:
         digest = self.make_digest(challenge, self.get_node().get_cookie())

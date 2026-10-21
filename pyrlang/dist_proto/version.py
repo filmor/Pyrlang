@@ -16,8 +16,8 @@
 protocol
 """
 
-DIST_VSN_MAX = 6  # optional since OTP-23, made mandatory in OTP-25
-DIST_VSN_MIN = 5  # nodes older than OTP-23 down to ancient R6B
+DIST_VSN_MAX = 6
+DIST_VSN_MIN = 6  # OTP 26+ only
 
 DIST_VSN_PAIR = (DIST_VSN_MAX, DIST_VSN_MIN)
 " Supported dist_proto protocol version (MAX,MIN). "

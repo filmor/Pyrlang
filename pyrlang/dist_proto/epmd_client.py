@@ -135,32 +135,20 @@ class EPMDClient(asyncio.Protocol):
         :return: Creation value if all is well, connection remains on.
             On error returns -1
         """
-        # Reply will be one of:
-        # - ALIVE2_RESP [121,0,Creation:16] for OK, otherwise [121,Error]
-        # - ALIVE2_X_RESP [118,0,Creation:32] for OK, otherwise [118,Error]
-        # The latter if both the node and EPMD support distribution version 6.
+        # ALIVE2_X_RESP [118,0,Creation:32], otherwise [118,Error].
         if self.reader_ is None:
             raise EPMDClientError(
                 "No reader set in _read_alive2_reply [internal error]"
             )
 
-        reply = await self.reader_.read(2)
-        if not reply:
-            LOG.error("ALIVE2 Read error. Closed? %s", reply)
-            return -1
+        reply = await self.reader_.readexactly(2)
+        if reply[0] != 118:
+            raise EPMDClientError(f"Expected ALIVE2_X_RESP (OTP 26+), got {reply[0]}")
 
         if reply[1] == 0:
-            if reply[0] == 121:  # ALIVE2_RESP
-                cr = await self.reader_.read(2)
-                (creation,) = struct.unpack(">H", cr)
-                return creation
-            elif reply[0] == 118:  # ALIVE2_X_RESP
-                cr = await self.reader_.read(4)
-                (creation,) = struct.unpack(">I", cr)
-                return creation
-            else:
-                LOG.error("Expected ALIVE2 response, got (%d)", reply[0])
-                return -1
+            cr = await self.reader_.readexactly(4)
+            (creation,) = struct.unpack(">I", cr)
+            return creation
 
         LOG.error("ALIVE2 returned error %s", reply[1])
         return -1
