@@ -810,7 +810,7 @@ dev = [
 [[package]]
 name = "pyrlang-term"
 version = "1.5a0"
-source = { git = "https://github.com/filmor/Term.git#90d96b91005f71eb727cafe2fc8372d21cdc432b" }
+source = { git = "https://github.com/filmor/Term.git#1407d961f92d2284dbd519d02758772da8d60b2a" }
 
 [[package]]
 name = "pytest"
