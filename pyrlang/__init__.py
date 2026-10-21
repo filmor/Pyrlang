@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from pyrlang.util import start_pyrlang
 from pyrlang.node import Node
+from pyrlang.util import start_pyrlang
+
+__all__ = ["Node", "start_pyrlang"]
 
 start_pyrlang()

@@ -14,9 +14,10 @@
 import logging
 import traceback
 
-from pyrlang.gen.server import GenServer
-from pyrlang.gen.decorators import call, cast, info
 from term.atom import Atom
+
+from pyrlang.gen.decorators import call, cast, info
+from pyrlang.gen.server import GenServer
 
 LOG = logging.getLogger(__name__)
 
@@ -24,18 +25,18 @@ LOG = logging.getLogger(__name__)
 class Rex(GenServer):
     def __init__(self):
         super().__init__()
-        self.get_node().register_name(self, Atom('rex'))
+        self.get_node().register_name(self, Atom("rex"))
 
     @call(1, lambda msg: True)
     def handle_call(self, msg):
-        if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom('call'):
+        if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom("call"):
             LOG.error("rex unknown call msg: %s", msg)
             return
         return act_on_msg(msg)
 
     @cast(1, lambda msg: True)
     def handle_cast(self, msg):
-        if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom('cast'):
+        if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom("cast"):
             LOG.error("rex unknown cast msg: %s", msg)
             return
         act_on_msg(msg)
@@ -55,14 +56,16 @@ def act_on_msg(msg):
 def execute(mod, fun, args, traceback_depth=5):
     try:
         # we use fromlist so we get the deepest module back
-        pmod = __import__(mod, fromlist=['no_use'])
+        pmod = __import__(mod, fromlist=["no_use"])
         pfun = getattr(pmod, fun)
         return pfun(*args)
     except Exception as e:
         if traceback_depth > 0:
             e.traceback = traceback.format_exc(traceback_depth)
-        LOG.exception("got an exception when executing RPC call %s.%s(*%s)",
-                      mod, fun, args)
+        LOG.exception(
+            "got an exception when executing RPC call %s.%s(*%s)", mod, fun, args
+        )
         return e
 
-__all__ = ['Rex']
+
+__all__ = ["Rex"]

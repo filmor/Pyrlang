@@ -12,11 +12,11 @@
 import logging
 
 from colors import color
-
-from pyrlang.node import Node
 from term import Atom
 
-LOG = logging.getLogger(color("EXAMPLE1", fg='lime'))
+from pyrlang.node import Node
+
+LOG = logging.getLogger(color("EXAMPLE1", fg="lime"))
 
 
 async def example_main(node):
@@ -25,9 +25,11 @@ async def example_main(node):
     # To be able to send to Erlang shell by name first give it a registered
     # name: `erlang:register(shell, self()).`
     # To see an incoming message in shell: `flush().`
-    await node.send(sender=fake_pid,
-                    receiver=(Atom('erl@127.0.0.1'), Atom('shell')),
-                    message=Atom('hello'))
+    await node.send(
+        sender=fake_pid,
+        receiver=(Atom("erl@127.0.0.1"), Atom("shell")),
+        message=Atom("hello"),
+    )
     LOG.info("example_main: Done")
 
 

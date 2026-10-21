@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Implement shared pieces of Erlang node negotiation and dist_proto
-    protocol
+"""Implement shared pieces of Erlang node negotiation and dist_proto
+protocol
 """
 
 DIST_VSN_MAX = 6  # optional since OTP-23, made mandatory in OTP-25
@@ -24,12 +24,14 @@ DIST_VSN_PAIR = (DIST_VSN_MAX, DIST_VSN_MIN)
 
 
 def dist_version_check(max_min: tuple) -> bool:
-    """ Check pair of versions against versions which are supported by us
+    """Check pair of versions against versions which are supported by us
 
-        :type max_min: tuple(int, int)
-        :param max_min: (Max, Min) version pair for peer-supported dist version
+    :type max_min: tuple(int, int)
+    :param max_min: (Max, Min) version pair for peer-supported dist version
     """
-    return DIST_VSN_MIN <= max_min[0] and max_min[1] <= DIST_VSN_MAX # do ranges overlap?
+    return (
+        DIST_VSN_MIN <= max_min[0] and max_min[1] <= DIST_VSN_MAX
+    )  # do ranges overlap?
 
 
 def check_valid_dist_version(dist_vsn: int) -> bool:
@@ -39,5 +41,6 @@ def check_valid_dist_version(dist_vsn: int) -> bool:
     :return: True if ok
     """
     return DIST_VSN_MIN <= dist_vsn <= DIST_VSN_MAX
+
 
 # __all__ = ['DIST_VSN_MAX', 'DIST_VSN_MIN', 'DIST_VSN_PAIR']

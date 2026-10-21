@@ -15,19 +15,20 @@
 
 import logging
 
+from colors import color
 from term import Atom
+
 from pyrlang.node import Node
 from pyrlang.process import Process
-from colors import color
 
-LOG = logging.getLogger(color("EXAMPLE2", fg='lime'))
+LOG = logging.getLogger(color("EXAMPLE2", fg="lime"))
 logging.getLogger("").setLevel(logging.DEBUG)
 
 
 class MyProcess(Process):
     def __init__(self) -> None:
         Process.__init__(self)
-        self.get_node().register_name(self, Atom('my_process'))  # optional
+        self.get_node().register_name(self, Atom("my_process"))  # optional
         LOG.info("Registering process - 'my_process'")
 
     def handle_one_inbox_message(self, msg):

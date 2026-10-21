@@ -9,12 +9,13 @@
 
 import logging
 
+from colors import color
 from term import Atom
+
 from pyrlang.node import Node
 from pyrlang.process import Process
-from colors import color
 
-LOG = logging.getLogger(color("EXAMPLE6", fg='lime'))
+LOG = logging.getLogger(color("EXAMPLE6", fg="lime"))
 logging.getLogger("").setLevel(logging.DEBUG)
 
 
@@ -32,8 +33,10 @@ class LinkExample6(Process):
             n.link_nowait(self.pid_, msg[1])
 
             def exit_fn():
-                n.exit_process(sender=self.pid_, receiver=msg[1],
-                               reason=Atom("example6_link_exit"))
+                n.exit_process(
+                    sender=self.pid_, receiver=msg[1], reason=Atom("example6_link_exit")
+                )
+
             loop = self.get_node().get_loop()
             loop.call_later(0.5, exit_fn)
         else:
@@ -43,7 +46,7 @@ class LinkExample6(Process):
         #
         # 1.2. Exiting remote linked process should also exit this process
         #
-        LOG.info("LinkExample6: Received EXIT(%s)" % reason)
+        LOG.info(f"LinkExample6: Received EXIT({reason})")
         Process.exit(self, reason)
 
 
@@ -59,25 +62,29 @@ def main():
     #
     p1 = LinkExample6()
 
-    LOG.info("Sending {example6, test_link, %s} to remote 'example6'" % p1.pid_)
-    remote_receiver_name = (Atom('erl@127.0.0.1'), Atom("example6"))
+    LOG.info(f"Sending {{example6, test_link, {p1.pid_}}} to remote 'example6'")
+    remote_receiver_name = (Atom("erl@127.0.0.1"), Atom("example6"))
 
     def send_task():
-        node.send_nowait(sender=p1.pid_,
-                         receiver=remote_receiver_name,
-                         message=(Atom("example6"), Atom("test_link"), p1.pid_))
+        node.send_nowait(
+            sender=p1.pid_,
+            receiver=remote_receiver_name,
+            message=(Atom("example6"), Atom("test_link"), p1.pid_),
+        )
 
     sleep_sec = 5
-    LOG.info("Sleep %d sec" % sleep_sec)
+    LOG.info("Sleep %d sec", sleep_sec)
 
     #
     # 3. End, sending a stop message
     #
     def task_sleep1():
         LOG.info(color("Stopping remote loop", fg="red"))
-        node.send_nowait(sender=p1.pid_,
-                         receiver=remote_receiver_name,
-                         message=(Atom("example6"), Atom("stop")))
+        node.send_nowait(
+            sender=p1.pid_,
+            receiver=remote_receiver_name,
+            message=(Atom("example6"), Atom("stop")),
+        )
 
     def task_sleep2():
         node.destroy()

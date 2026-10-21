@@ -9,14 +9,14 @@
 #
 
 import logging
-import asyncio
 
+from colors import color
 from term import Atom
+
 from pyrlang.node import Node
 from pyrlang.process import Process
-from colors import color
 
-LOG = logging.getLogger(color("EXAMPLE7", fg='lime'))
+LOG = logging.getLogger(color("EXAMPLE7", fg="lime"))
 logging.getLogger("").setLevel(logging.DEBUG)
 
 
@@ -34,8 +34,12 @@ class MonitorExample7(Process):
             n.monitor_process(self.pid_, msg[1])
 
             def exit_fn():
-                n.exit_process(sender=self.pid_, receiver=msg[1],
-                               reason=Atom("example7_monitor_exit"))
+                n.exit_process(
+                    sender=self.pid_,
+                    receiver=msg[1],
+                    reason=Atom("example7_monitor_exit"),
+                )
+
             self.node_db.get_loop().call_later(0.5, exit_fn)
         else:
             LOG.info("MonitorExample7: Incoming %s", msg)
@@ -44,7 +48,7 @@ class MonitorExample7(Process):
         #
         # 1.2. Exiting remote linked process should also exit this process
         #
-        LOG.info("MonitorExample7: Received EXIT(%s)" % reason)
+        LOG.info("MonitorExample7: Received EXIT(%s)", reason)
         Process.exit(self, reason)
 
 
@@ -60,24 +64,27 @@ def main():
     #
     proc = MonitorExample7()
 
-    LOG.info("Sending {example7, test_monitor, %s} to remote 'example7'" % proc.pid_)
-    remote_receiver_name = (Atom('erl@127.0.0.1'), Atom("example7"))
-    send_task = node.send(sender=proc.pid_,
-                          receiver=remote_receiver_name,
-                          message=(Atom("example7"),
-                                   Atom("test_monitor"),
-                                   proc.pid_))
+    LOG.info(f"Sending {{example7, test_monitor, {proc.pid_}}} to remote 'example7'")
+    remote_receiver_name = (Atom("erl@127.0.0.1"), Atom("example7"))
+    send_task = node.send(
+        sender=proc.pid_,
+        receiver=remote_receiver_name,
+        message=(Atom("example7"), Atom("test_monitor"), proc.pid_),
+    )
 
     sleep_sec = 5
-    LOG.info("Sleep %d sec" % sleep_sec)
+    LOG.info("Sleep %d sec", sleep_sec)
 
     #
     # 3. End, sending a stop message
     #
     def stop_task():
         LOG.info(color("Stopping remote loop", fg="red"))
-        node.send_nowait(sender=proc.pid_, receiver=remote_receiver_name,
-                         message=(Atom("example7"), Atom("stop")))
+        node.send_nowait(
+            sender=proc.pid_,
+            receiver=remote_receiver_name,
+            message=(Atom("example7"), Atom("stop")),
+        )
 
     def destroy_task():
         LOG.error("Destroying")

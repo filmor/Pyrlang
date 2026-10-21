@@ -14,9 +14,14 @@
 
 from pyrlang.dist_proto.client import DistClientProtocol
 from pyrlang.dist_proto.distribution import ErlangDistribution
+
 # from pyrlang.dist_proto.epmd_client import EPMDClient
 from pyrlang.dist_proto.flags import DistributionFlags
 from pyrlang.dist_proto.server import DistServerProtocol
 
-__all__ = ['ErlangDistribution', 'DistServerProtocol',
-           'DistClientProtocol', 'DistributionFlags']
+__all__ = [
+    "DistClientProtocol",
+    "DistServerProtocol",
+    "DistributionFlags",
+    "ErlangDistribution",
+]

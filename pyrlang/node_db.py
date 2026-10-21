@@ -1,4 +1,3 @@
-
 class NodeDB:
     """
     A singleton class for keeping track of the nodes that created withing
@@ -9,6 +8,7 @@ class NodeDB:
     by default but still give some options if you really know what you're doing.
 
     """
+
     __singleton = None
 
     def __new__(cls):
@@ -41,7 +41,7 @@ class NodeDB:
             raise AttributeError("there is no active node")
         node_name = self._get_key(node_name)
         if node_name not in self.__db:
-            msg = "there is no node {} registered".format(node_name)
+            msg = f"there is no node {node_name} registered"
             raise AttributeError(msg)
         return self.__db[node_name]
 
@@ -66,11 +66,12 @@ class NodeDB:
         needs to be deactivated first
         """
         if self.__active_node is not None:
-            raise AttributeError("there is already an active node: "
-                                 "{}".format(self.__active_node))
+            raise AttributeError(
+                f"there is already an active node: {self.__active_node}"
+            )
         node_name = self._get_key(node)
         if node_name not in self.__db:
-            raise AttributeError("node {} not in database".format(node))
+            raise AttributeError(f"node {node} not in database")
         self.__active_node = node_name
 
     def deactivate(self, node):
@@ -82,7 +83,7 @@ class NodeDB:
         """
         key = self._get_key(node)
         if key != self.__active_node:
-            raise AttributeError("{} is not the active node".format(node))
+            raise AttributeError(f"{node} is not the active node")
         self.__active_node = None
 
     def remove(self, node):
@@ -93,4 +94,3 @@ class NodeDB:
         if key == self.__active_node:
             self.deactivate(node)
         self.__db.pop(key)
-

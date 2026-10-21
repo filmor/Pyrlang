@@ -27,11 +27,12 @@ def _simple_run(data):
     return data
 
 
-class Match(object):
+class Match:
     """
     Match class to mimic an aid in the erlang pattern matching used in calls
     and, in our case more importantly, in receive
     """
+
     def __init__(self, patterns=None):
         if not patterns:
             # make catch all that returns raw data
@@ -49,7 +50,7 @@ class Match(object):
         return self(data)
 
 
-class Pattern(object):
+class Pattern:
     def __init__(self, match_fun=None, run_fun=None):
         if not match_fun:
             match_fun = _simple_match
@@ -58,9 +59,9 @@ class Pattern(object):
             run_fun = _simple_run
 
         if not callable(match_fun):
-            raise AttributeError("match fun {} not callable".format(match_fun))
+            raise TypeError(f"match fun {match_fun} not callable")
         if not callable(run_fun):
-            raise AttributeError("run fun {} not callable".format(run_fun))
+            raise TypeError(f"run fun {run_fun} not callable")
         self.__match_fun = match_fun
         self.__run_fun = run_fun
 
@@ -69,4 +70,3 @@ class Pattern(object):
 
     def run(self, data):
         return self.__run_fun(data)
-

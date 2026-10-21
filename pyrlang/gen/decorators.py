@@ -21,29 +21,31 @@ the classes `CallDecorator`, `CastDecorator`, `InfoDecorator` instead
 """
 
 import asyncio
-from typing import Optional
+import logging
 
 from pyrlang.match import Pattern
 
-import logging
 LOG = logging.getLogger(__name__)
 
 
 def async_wrapper_factory(fun):
     async def async_wrapper(*args, **kwargs):
         return fun(*args, **kwargs)
+
     return async_wrapper
 
 
-class HandleDecorator(object):
+class HandleDecorator:
     """
     Base class for handler Decorators, don't use directly
     """
+
     handler_type = None  # type: Optional[str]
 
     def __init__(self, order, pattern=None):
         if not pattern:
             import warnings
+
             warnings.warn(DeprecationWarning("you should specify order"))
             pattern = order
             # high but not ensured highest this should be
@@ -55,9 +57,9 @@ class HandleDecorator(object):
 
     def __call__(self, fun):
         if not asyncio.iscoroutinefunction(fun):
-            LOG.debug("function %s is a handle_%s and is not async",
-                      fun,
-                      self.handler_type)
+            LOG.debug(
+                "function %s is a handle_%s and is not async", fun, self.handler_type
+            )
             fun = async_wrapper_factory(fun)
 
         fun._gen_handler = self.handler_type
@@ -87,7 +89,8 @@ class CallDecorator(HandleDecorator):
     handle_call decorator, decorate functions that should be part of the
     handle_call matching
     """
-    handler_type = 'call'  # type: Optional[str]
+
+    handler_type = "call"  # type: Optional[str]
 
     @staticmethod
     def _pattern_run_fun_factory(fun):
@@ -118,7 +121,8 @@ class CastDecorator(HandleDecorator):
     handle_cast decorator, decorate functions that should be part of the
     handle_cast matching
     """
-    handler_type = 'cast'
+
+    handler_type = "cast"
 
     @staticmethod
     def _pattern_run_fun_factory(fun):
@@ -151,11 +155,10 @@ class InfoDecorator(HandleDecorator):
     handle_info decorator, decorate functions that should be part of the
     handle_info matching
     """
-    handler_type = 'info'
+
+    handler_type = "info"
 
 
 def info(*args, **kwargs):
     """wrapper function around the `InfoDecorator` class"""
     return InfoDecorator(*args, **kwargs)
-
-

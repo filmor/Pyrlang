@@ -93,26 +93,32 @@ DFLAG_V4_NC = 1 << 34
     This flag will become mandatory in OTP 26.
 """
 
-DEFAULT_DFLAGS = (DFLAG_EXT_REFS |
-                  DFLAG_EXT_PIDS_PORTS |
-                  DFLAG_FUN_TAGS | DFLAG_NEW_FUN_TAGS |
-                  DFLAG_EXPORT_PTR_TAG |
-                  DFLAG_BIT_BINARIES |
-                  DFLAG_NEW_FLOATS |
-                  DFLAG_MAP_TAG |
-                  DFLAG_BIG_CREATION |
-                  DFLAG_UTF8_ATOMS | DFLAG_SMALL_ATOM_TAGS |
-                  DFLAG_DIST_MONITOR_NAME | DFLAG_DIST_MONITOR |
-                  DFLAGS_HANDSHAKE_23 | DFLAG_UNLINK_ID |
-                  DFLAG_V4_NC)
+DEFAULT_DFLAGS = (
+    DFLAG_EXT_REFS
+    | DFLAG_EXT_PIDS_PORTS
+    | DFLAG_FUN_TAGS
+    | DFLAG_NEW_FUN_TAGS
+    | DFLAG_EXPORT_PTR_TAG
+    | DFLAG_BIT_BINARIES
+    | DFLAG_NEW_FLOATS
+    | DFLAG_MAP_TAG
+    | DFLAG_BIG_CREATION
+    | DFLAG_UTF8_ATOMS
+    | DFLAG_SMALL_ATOM_TAGS
+    | DFLAG_DIST_MONITOR_NAME
+    | DFLAG_DIST_MONITOR
+    | DFLAGS_HANDSHAKE_23
+    | DFLAG_UNLINK_ID
+    | DFLAG_V4_NC
+)
 """ Default flags value represents current Pyrlang library features
     as a combination of feature bits.
 """
 
 
 class DistributionFlags:
-    """ A class holding an integer with features that are supported
-        by this node, and the network cookie.
+    """A class holding an integer with features that are supported
+    by this node, and the network cookie.
     """
 
     def __init__(self, cookie: str, dflags: int = DEFAULT_DFLAGS) -> None:

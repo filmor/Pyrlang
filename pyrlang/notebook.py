@@ -11,25 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import logging
 from types import ModuleType
-from typing import Callable, List, Tuple, Dict, Optional, Union, Sequence
+from typing import Callable, Sequence
 
-from pyrlang.gen.server import GenServer
-from pyrlang.gen.decorators import call as main_call
-from pyrlang.util import as_str
 from term.atom import Atom
 from term.basetypes import Term
 from term.pid import Pid
+
+from pyrlang.gen.decorators import call as main_call
+from pyrlang.gen.server import GenServer
+from pyrlang.util import as_str
 
 LOG = logging.getLogger("pyrlang.notebook")
 
 
 def call(name, msg_len=2):
-    """ specific decorator function
+    """specific decorator function
 
-        Handle the decorator where we expect a tuple of a specific size and
-        the first item being an atom with specific name
+    Handle the decorator where we expect a tuple of a specific size and
+    the first item being an atom with specific name
     """
     atom = Atom(name)
 
@@ -38,25 +41,23 @@ def call(name, msg_len=2):
             return False
         if len(msg) != msg_len:
             return False
-        if msg[0] != atom:
-            return False
-        return True
+        return msg[0] == atom
 
     return main_call(pattern_match)
 
 
 class Notebook(GenServer):
-    """ Implements a flow for performing remote calculations from Erlang on
-        Python node, while storing the results on Python side until they are
-        ready. Each call result is stored in notebook history and a value index
-        is returned to the caller. This index can be used as an argument
-        in subsequent calls.
+    """Implements a flow for performing remote calculations from Erlang on
+    Python node, while storing the results on Python side until they are
+    ready. Each call result is stored in notebook history and a value index
+    is returned to the caller. This index can be used as an argument
+    in subsequent calls.
     """
 
     def __init__(self, options: dict):
         super().__init__()
 
-        self.history_ = dict()  # type: Dict[Term, Term]
+        self.history_ = {}  # type: Dict[Term, Term]
         """ Recent calculation results indexed by integers or names. """
 
         self.history_ids_ = []  # type: List[Term]
@@ -72,17 +73,17 @@ class Notebook(GenServer):
             create value_not_found exception, also propagated to Erlang side. 
         """
 
-    @call('nb_call')
+    @call("nb_call")
     def nb_call(self, msg):
-        """ Remote call from ``py.erl``: Calls function defined in ``args``,
-            stores the result in history.
+        """Remote call from ``py.erl``: Calls function defined in ``args``,
+        stores the result in history.
 
-            :param msg: contains param in msg[1] ``path``: list of strings
-                where first one is to be imported and remaining are used to
-                find the function; ``args``: list of arguments for the callable;
-                ``kwargs``; ``immediate``: will return the value instead of the
-                value ref if this is ``True``, also will not update the history.
-            :returns: Index for stored history value.
+        :param msg: contains param in msg[1] ``path``: list of strings
+            where first one is to be imported and remaining are used to
+            find the function; ``args``: list of arguments for the callable;
+            ``kwargs``; ``immediate``: will return the value instead of the
+            value ref if this is ``True``, also will not update the history.
+        :returns: Index for stored history value.
         """
         param = msg[1]
         call_path = param[Atom("path")]
@@ -94,14 +95,14 @@ class Notebook(GenServer):
         result = fn(*call_args, **call_kwargs)
 
         if call_imm:
-            return Atom('value'), result
+            return Atom("value"), result
 
         index = self._store_result(result)
-        return Atom('ok'), result.__class__.__name__, index
+        return Atom("ok"), result.__class__.__name__, index
 
-    @call('nb_batch', 3)
-    def nb_batch(self, msg) -> Tuple[Term, Term, Term]:
-        """ Take a remote call from Erlang to execute batch of Python calls. """
+    @call("nb_batch", 3)
+    def nb_batch(self, msg) -> tuple[Term, Term, Term]:
+        """Take a remote call from Erlang to execute batch of Python calls."""
         batch = msg[1]
         param = msg[2]
         if not batch:
@@ -117,9 +118,8 @@ class Notebook(GenServer):
             fn = self._resolve_path(call_path)
             result = fn(*call_args, **call_kwargs) if callable(fn) else None  # type: Term
             last_result_name = self._store_result_as(result, call_ret)  # type: Term
-        else:
-            result = None
-            last_result_name = None
+        result = None
+        last_result_name = None
 
         if call_imm:
             return Atom("value"), result, None
@@ -127,8 +127,8 @@ class Notebook(GenServer):
         return Atom("ok"), result.__class__.__name__, last_result_name
 
     def _store_result(self, result):
-        """ Store result as a new numbered value. Trim overflowing values over
-            the ``history_limit_``.
+        """Store result as a new numbered value. Trim overflowing values over
+        the ``history_limit_``.
         """
         index = self.value_id_
         self.value_id_ += 1
@@ -138,8 +138,8 @@ class Notebook(GenServer):
         return index
 
     def _store_result_as(self, result: Term, store_key: Term) -> Term:
-        """ Store result as a new named value. Trim overflowing values over
-            the ``history_limit_``.
+        """Store result as a new named value. Trim overflowing values over
+        the ``history_limit_``.
         """
         LOG.debug("Store as %s => %s", store_key, result)
         self.history_[store_key] = result
@@ -160,26 +160,26 @@ class Notebook(GenServer):
 
         del self.history_ids_[0:overflow]
 
-    @call('nb_retrieve')
+    @call("nb_retrieve")
     def nb_retrieve(self, msg):
-        """ Remote call from ``py.erl``: Retrieves a historical value by index.
-        """
+        """Remote call from ``py.erl``: Retrieves a historical value by index."""
         value_id = msg[1]
         if value_id in self.history_:
-            return Atom('ok'), self.history_[value_id]
+            return Atom("ok"), self.history_[value_id]
 
-        return Atom('error'), Atom('not_found')
+        return Atom("error"), Atom("not_found")
 
-    def _resolve_path(self, p: List[str]) -> Union[Callable, ModuleType]:
-        """ Imports p[0] and then follows the list p, by applying getattr()
-            repeatedly. """
+    def _resolve_path(self, p: list[str]) -> Callable | ModuleType:
+        """Imports p[0] and then follows the list p, by applying getattr()
+        repeatedly."""
         if isinstance(p, str):
             p = [p]
 
         # First element would be the import, or a stored value reference
         first_path_element = p[0]
-        if isinstance(first_path_element, tuple) \
-                and first_path_element[0] == Atom("$pyrlangval"):
+        if isinstance(first_path_element, tuple) and first_path_element[0] == Atom(
+            "$pyrlangval"
+        ):
             # First element is {'$pyrlangval', X} - query the value
             val = self._retrieve_value(first_path_element)
         else:
@@ -196,18 +196,21 @@ class Notebook(GenServer):
         k = pyrlang_val[1]
 
         if k not in self.history_:
-            LOG.error("Value id %s not found in history (keys %s)",
-                      k, self.history_.keys())
+            LOG.error(
+                "Value id %s not found in history (keys %s)", k, self.history_.keys()
+            )
 
         return self.history_[k]
 
     def _resolve_valuerefs_in_args(self, args: list):
-        """ For list of args, find pyrlangval references and resolve them from
-            the history dict.
+        """For list of args, find pyrlangval references and resolve them from
+        the history dict.
         """
+
         def resolve_arg(pyrlangval_tuple):
-            if isinstance(pyrlangval_tuple, tuple) \
-                    and pyrlangval_tuple[0] == Atom("$pyrlangval"):
+            if isinstance(pyrlangval_tuple, tuple) and pyrlangval_tuple[0] == Atom(
+                "$pyrlangval"
+            ):
                 return self._retrieve_value(pyrlangval_tuple)
 
             return pyrlangval_tuple
@@ -215,30 +218,31 @@ class Notebook(GenServer):
         return list(map(resolve_arg, args))
 
     def _resolve_valuerefs_in_kwargs(self, dct: dict):
-        """ For a dict of args, find pyrlangval references in dict values and
-            resolve them from the history dict.
+        """For a dict of args, find pyrlangval references in dict values and
+        resolve them from the history dict.
         """
+
         def resolve_arg(key_val):
             key, pyrlangval_tuple = key_val
-            if isinstance(pyrlangval_tuple, tuple) \
-                    and pyrlangval_tuple[0] == Atom("$pyrlangval"):
+            if isinstance(pyrlangval_tuple, tuple) and pyrlangval_tuple[0] == Atom(
+                "$pyrlangval"
+            ):
                 return key, self._retrieve_value(pyrlangval_tuple)
 
             return key, pyrlangval_tuple
 
         return dict(map(resolve_arg, dct.items()))
 
-    @call('exit')
+    @call("exit")
     def handle_exit_call(self, msg):
         reason = msg[1]
         self.exit(reason)
-        return Atom('ok')
+        return Atom("ok")
 
 
 def new_context(options: dict) -> Pid:
-    """ Create a new remote-call notebook context. Node_name argument will be
-        automatically prepended to args by Rex.
+    """Create a new remote-call notebook context. Node_name argument will be
+    automatically prepended to args by Rex.
     """
     nb = Notebook(options=options)
     return nb.pid_
-

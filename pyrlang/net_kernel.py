@@ -14,29 +14,29 @@
 
 import logging
 
-from pyrlang.gen.server import GenServer
-from pyrlang.gen.decorators import call
 from term.atom import Atom
+
+from pyrlang.gen.decorators import call
+from pyrlang.gen.server import GenServer
 
 LOG = logging.getLogger(__name__)
 
 
 class NetKernel(GenServer):
-    """ A special process which registers itself as ``net_kernel`` and handles
-        one specific ``is_auth`` message, which is used by ``net_adm:ping``.
+    """A special process which registers itself as ``net_kernel`` and handles
+    one specific ``is_auth`` message, which is used by ``net_adm:ping``.
     """
 
     def __init__(self) -> None:
-        """ :param node: pyrlang.node.Node
-        """
+        """:param node: pyrlang.node.Node"""
         super().__init__()
-        self.node_db.get().register_name(self, Atom('net_kernel'))
+        self.node_db.get().register_name(self, Atom("net_kernel"))
 
-    @call(lambda msg: type(msg) == tuple and
-                      len(msg) == 2 and
-                      msg[0] == Atom('is_auth'))
+    @call(
+        lambda msg: type(msg) == tuple and len(msg) == 2 and msg[0] == Atom("is_auth")
+    )
     def is_auth(self, msg):
-        return Atom('yes')
+        return Atom("yes")
 
 
-__all__ = ['NetKernel']
+__all__ = ["NetKernel"]

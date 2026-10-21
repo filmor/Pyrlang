@@ -10,12 +10,13 @@
 
 import logging
 
+from colors import color
 from term import Atom
+
 from pyrlang.node import Node
 from pyrlang.process import Process
-from colors import color
 
-LOG = logging.getLogger(color("EXAMPLE5", fg='lime'))
+LOG = logging.getLogger(color("EXAMPLE5", fg="lime"))
 logging.getLogger("").setLevel(logging.DEBUG)
 
 
@@ -27,7 +28,7 @@ class TestLinkProcess(Process):
         LOG.info("TestLinkProcess: Incoming %s", msg)
 
     def exit(self, reason=None):
-        LOG.info("TestLinkProcess: Received EXIT(%s)" % reason)
+        LOG.info(f"TestLinkProcess: Received EXIT({reason})")
         node = self.get_node()
 
         #
@@ -36,10 +37,9 @@ class TestLinkProcess(Process):
         #   then will send an exit signal.
         #
         p2 = TestMonitorProcess()
-        LOG.info("Sending {example5, test_monitor, %s} to remote 'example5'" % p2.pid_)
+        LOG.info(f"Sending {{example5, test_monitor, {p2.pid_}}} to remote 'example5'")
         msg = (Atom("example5"), Atom("test_monitor"), p2.pid_)
-        node.send_nowait(sender=p2.pid_, receiver=remote_receiver_name(),
-                         message=msg)
+        node.send_nowait(sender=p2.pid_, receiver=remote_receiver_name(), message=msg)
 
         super().exit(reason)
 
@@ -52,20 +52,23 @@ class TestMonitorProcess(Process):
         LOG.info("TestMonitorProcess: Incoming %s", msg)
 
     def exit(self, reason=None):
-        LOG.info("TestMonitorProcess: Received EXIT(%s)" % reason)
+        LOG.info(f"TestMonitorProcess: Received EXIT({reason})")
         node = self.get_node()
         #
         # 3. End, sending a stop message
         #
         LOG.info(color("Stopping erlang node", fg="red"))
-        node.send_nowait(sender=self.pid_, receiver=remote_receiver_name(),
-                         message=(Atom("example5"), Atom("stop")))
+        node.send_nowait(
+            sender=self.pid_,
+            receiver=remote_receiver_name(),
+            message=(Atom("example5"), Atom("stop")),
+        )
         LOG.error("Done")
         super().exit(reason)
 
 
 def remote_receiver_name():
-    return Atom('erl@127.0.0.1'), Atom("example5")
+    return Atom("erl@127.0.0.1"), Atom("example5")
 
 
 def main():
@@ -79,14 +82,14 @@ def main():
     #   results (exit signal will be returned to Erlang).
     #
     p1 = TestLinkProcess()
-    LOG.info("Sending {example5, test_link, %s} to remote 'example5'" % p1.pid_)
+    LOG.info(f"Sending {{example5, test_link, {p1.pid_}}} to remote 'example5'")
 
     def task():
-        node.send_nowait(sender=p1.pid_,
-                         receiver=remote_receiver_name(),
-                         message=(Atom("example5"),
-                                  Atom("test_link"),
-                                  p1.pid_))
+        node.send_nowait(
+            sender=p1.pid_,
+            receiver=remote_receiver_name(),
+            message=(Atom("example5"), Atom("test_link"), p1.pid_),
+        )
 
     event_loop.call_soon(task)
 

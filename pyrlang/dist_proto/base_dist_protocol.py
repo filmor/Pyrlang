@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Base abstract Distribution connection class
-"""
+"""Base abstract Distribution connection class"""
+
 import asyncio
 import logging
 import struct
 import time
 from hashlib import md5
-from typing import Tuple, Optional
+
+from term import codec, util
+from term.atom import Atom
 
 from pyrlang.errors import DistributionError
 from pyrlang.node_db import NodeDB
-from term import codec
-from term import util
-from term.atom import Atom
 
 LOG = logging.getLogger(__name__)
 
@@ -60,39 +59,39 @@ CONTROL_TERM_UNLINK_ID_ACK = 36
 
 
 class BaseDistProtocol(asyncio.Protocol):
-    """ Defines Erlang distribution protocol (shared parts).
-        Concrete implementations for incoming (DistServerProtocol) and outgoing
-        (DistClientProtocol) are located in the corresponding modules.
+    """Defines Erlang distribution protocol (shared parts).
+    Concrete implementations for incoming (DistServerProtocol) and outgoing
+    (DistClientProtocol) are located in the corresponding modules.
     """
 
     #
     # Used by both Incoming and Outgoing protocols
     #
-    DISCONNECTED = 'disconn'
-    CONNECTED = 'conn'
+    DISCONNECTED = "disconn"
+    CONNECTED = "conn"
 
     #
     # Used by Incoming protocol only
     #
-    RECV_NAME = 'recvname'
-    WAIT_CHALLENGE_REPLY = 'wait_ch_reply'
+    RECV_NAME = "recvname"
+    WAIT_CHALLENGE_REPLY = "wait_ch_reply"
 
     #
     # Used by Outgoing protocol only
     #
 
-    RECV_STATUS = 'recv_status'
+    RECV_STATUS = "recv_status"
     # State 'alive' means that this connection is duplicate, next message
     # may be 'true' to allow using this new connection or 'false', requesting
     # this connection to be closed
-    ALIVE = 'alive'
-    RECV_CHALLENGE = 'recv_challenge'
-    RECV_CHALLENGE_ACK = 'recv_challenge_ack'
+    ALIVE = "alive"
+    RECV_CHALLENGE = "recv_challenge"
+    RECV_CHALLENGE_ACK = "recv_challenge_ack"
 
     node_db = NodeDB()
 
     def __init__(self, node_name: str):
-        """ Create connection handler object. """
+        """Create connection handler object."""
         super().__init__()
 
         self.node_name_ = node_name
@@ -121,7 +120,7 @@ class BaseDistProtocol(asyncio.Protocol):
         """ FSM state for the protocol state-machine. """
 
         self.transport_ = None  # type: Optional[asyncio.Transport]
-        self.unconsumed_data_ = b''
+        self.unconsumed_data_ = b""
 
         self._last_interaction = time.time()
 
@@ -131,13 +130,12 @@ class BaseDistProtocol(asyncio.Protocol):
             self.transport_ = None
 
     def connection_made(self, transport: asyncio.BaseTransport):
-        """ Connection has been accepted and established (callback).
-        """
+        """Connection has been accepted and established (callback)."""
         # Ping the remote periodically if our state is CONNECTED
         self._schedule_periodic_ping_remote()
         # Check that there's been some activity between the nodes
         self._schedule_periodic_alive_check()
-        sock = transport.get_extra_info('socket')
+        sock = transport.get_extra_info("socket")
         if isinstance(transport, asyncio.Transport):
             self.transport_ = transport
         else:
@@ -168,34 +166,33 @@ class BaseDistProtocol(asyncio.Protocol):
             # Length is already visible but the data is not here yet
             return False
 
-        #packet = self.unconsumed_data_[offset:]
+        # packet = self.unconsumed_data_[offset:]
 
-        packet = self.unconsumed_data_[offset:(offset + pkt_size)]
-        self.unconsumed_data_ = self.unconsumed_data_[(offset + pkt_size):]
+        packet = self.unconsumed_data_[offset : (offset + pkt_size)]
+        self.unconsumed_data_ = self.unconsumed_data_[(offset + pkt_size) :]
 
         # Try to consume some data, remember the unconsumed tail
         # Loop while the data is consumed, stop when not consumed anymore
         self.on_packet(packet)
 
-        LOG.debug("unconsumed: %s, state=%s", self.unconsumed_data_,
-                  self.state_)
+        LOG.debug("unconsumed: %s, state=%s", self.unconsumed_data_, self.state_)
         return True
 
     def on_packet(self, data: bytes) -> bytes:
         raise NotImplementedError()
 
     def get_node(self):
-        """ Use this to get access to the Pyrlang node which owns this protocol.
-            :rtype: pyrlang2.node.Node
+        """Use this to get access to the Pyrlang node which owns this protocol.
+        :rtype: pyrlang2.node.Node
         """
         return self.node_db.get(self.node_name_)
 
     def connection_lost(self, _exc):
-        """ Handler is called when the client has disconnected """
+        """Handler is called when the client has disconnected"""
         self.state_ = self.DISCONNECTED
 
         if self.peer_name_ is not None:
-            #self._inform_local_node(("node_disconnected", self.peer_name_))
+            # self._inform_local_node(("node_disconnected", self.peer_name_))
             n = self.node_db.get(self.node_name_)
             n.unregister_dist_node(self.addr_)
 
@@ -203,48 +200,46 @@ class BaseDistProtocol(asyncio.Protocol):
         self.get_node().inbox_.put_nowait(msg)
 
     def _send_packet2(self, content: bytes):
-        """ Send a handshake-time status message with a 2 byte length prefix
-        """
+        """Send a handshake-time status message with a 2 byte length prefix"""
         LOG.debug("out %d: %s", len(content), content)
         msg = struct.pack(">H", len(content)) + content
         if self.transport_ is None:
-            return self.raise_protocol_error("Transport is None in _send_packet2 [internal error]")
+            return self.raise_protocol_error(
+                "Transport is None in _send_packet2 [internal error]"
+            )
         else:
             self.transport_.write(msg)
 
     def _send_packet4(self, content: bytes):
-        """ Send a connection-time status message with a 4 byte length prefix
-        """
+        """Send a connection-time status message with a 4 byte length prefix"""
         LOG.debug("out %d: %s", len(content), content)
         msg = struct.pack(">I", len(content)) + content
         if self.transport_ is None:
-            return self.raise_protocol_error("Transport is None in _send_packet4 [internal error]")
+            return self.raise_protocol_error(
+                "Transport is None in _send_packet4 [internal error]"
+            )
         self.transport_.write(msg)
 
     async def on_passthrough_message(self, control_term, msg_term):
-        """ On incoming 'p' message with control and data, handle it.
-            :raises DistributionError: when 'p' message is not a tuple
+        """On incoming 'p' message with control and data, handle it.
+        :raises DistributionError: when 'p' message is not a tuple
         """
         LOG.info("Dist msg_t=%s; ctrl_t=%s", msg_term, control_term)
 
         if type(control_term) != tuple:
-            raise DistributionError(
-                "In a 'p' message control term must be a tuple"
-            )
+            raise DistributionError("In a 'p' message control term must be a tuple")
 
         ctrl_msg_type = control_term[0]
 
         n = self.get_node()
 
         if ctrl_msg_type == CONTROL_TERM_REG_SEND:
-            return await n.send(sender=control_term[1],
-                                receiver=control_term[3],
-                                message=msg_term)
+            return await n.send(
+                sender=control_term[1], receiver=control_term[3], message=msg_term
+            )
 
         elif ctrl_msg_type == CONTROL_TERM_SEND:
-            return await n.send(sender=None,
-                                receiver=control_term[2],
-                                message=msg_term)
+            return await n.send(sender=None, receiver=control_term[2], message=msg_term)
 
         elif ctrl_msg_type == CONTROL_TERM_LINK:
             (_, from_pid, to_pid) = control_term
@@ -265,19 +260,18 @@ class BaseDistProtocol(asyncio.Protocol):
         elif ctrl_msg_type == CONTROL_TERM_MONITOR_P:
             (_, sender, target, ref) = control_term
             from pyrlang.errors import ProcessNotFoundError
+
             try:
-                return n.monitor_process(origin_pid=sender,
-                                         target=target,
-                                         ref=ref)
+                return n.monitor_process(origin_pid=sender, target=target, ref=ref)
             except ProcessNotFoundError:
                 pass
 
         elif ctrl_msg_type == CONTROL_TERM_DEMONITOR_P:
             (_, sender, target, ref) = control_term
             from pyrlang.errors import ProcessNotFoundError
+
             try:
-                return n.demonitor_process(origin_pid=sender, target=target,
-                                           ref=ref)
+                return n.demonitor_process(origin_pid=sender, target=target, ref=ref)
             except ProcessNotFoundError:
                 pass
 
@@ -289,10 +283,8 @@ class BaseDistProtocol(asyncio.Protocol):
         elif ctrl_msg_type == CONTROL_TERM_MONITOR_P_EXIT:
             (_, from_pid, to_pid, ref, reason) = control_term
             if to_pid.is_local_to(n):
-                down_msg = (
-                    Atom("DOWN"), ref, Atom("process"), from_pid, reason)
-                await n.send(sender=from_pid, receiver=to_pid,
-                             message=down_msg)
+                down_msg = (Atom("DOWN"), ref, Atom("process"), from_pid, reason)
+                await n.send(sender=from_pid, receiver=to_pid, message=down_msg)
 
         else:
             LOG.error("Unhandled 'p' message: %s; %s", control_term, msg_term)
@@ -310,7 +302,7 @@ class BaseDistProtocol(asyncio.Protocol):
 
         if self.state_ == self.CONNECTED and self.packet_len_size_ == 4:
             LOG.debug("sending periodic ping for %s", self)
-            self._send_packet4(b'')
+            self._send_packet4(b"")
 
     def _schedule_periodic_ping_remote(self):
         asyncio.get_event_loop().call_later(15.0, self._periodic_ping_remote)
@@ -320,9 +312,9 @@ class BaseDistProtocol(asyncio.Protocol):
             return
         self._schedule_periodic_alive_check()
         t = time.time() - self._last_interaction
-        LOG.debug("last interaction for dist com with %s was %ss ago",
-                  self.peer_name_,
-                  t)
+        LOG.debug(
+            "last interaction for dist com with %s was %ss ago", self.peer_name_, t
+        )
         if t > 30:
             self.destroy()
 
@@ -331,52 +323,50 @@ class BaseDistProtocol(asyncio.Protocol):
 
     def _handle_one_inbox_message(self, m):
         # Send a ('send', Dst, Msg) to deliver a message to the other side
-        if m[0] == 'send':
+        if m[0] == "send":
             (_, from_pid, dst, msg) = m
             ctrl = self._control_term_send(from_pid=from_pid, dst=dst)
             # LOG.info("Control msg %s; %s" % (ctrl, msg))
             return self._control_message(ctrl, msg)
 
-        elif m[0] == 'monitor_p_exit':
+        elif m[0] == "monitor_p_exit":
             (_, from_pid, to_pid, ref, reason) = m
-            ctrl = (CONTROL_TERM_MONITOR_P_EXIT,
-                    from_pid, to_pid, ref, reason)
+            ctrl = (CONTROL_TERM_MONITOR_P_EXIT, from_pid, to_pid, ref, reason)
             # LOG.info("Monitor proc exit: %s with %s", from_pid, reason)
             return self._control_message(ctrl, None)
 
-        elif m[0] == 'monitor_p':
+        elif m[0] == "monitor_p":
             (_, src_pid, target_pid, ref) = m
             ctrl = (CONTROL_TERM_MONITOR_P, src_pid, target_pid, ref)
             # LOG.info("Monitor %s -> %s with %s", src_pid, target_pid, reason)
             return self._control_message(ctrl, None)
 
-        elif m[0] in ['exit', 'exit2']:
+        elif m[0] in ["exit", "exit2"]:
             (_, from_pid, to_pid, reason) = m
-            control_tag = CONTROL_TERM_EXIT if m[0] == 'exit' \
-                else CONTROL_TERM_EXIT2
+            control_tag = CONTROL_TERM_EXIT if m[0] == "exit" else CONTROL_TERM_EXIT2
             ctrl = (control_tag, from_pid, to_pid, reason)
             LOG.info("Sending exit %s (node %s)", to_pid, to_pid.node_name_)
             return self._control_message(ctrl, None)
 
-        elif m[0] == 'link':
+        elif m[0] == "link":
             (_, pid1, pid2) = m
             ctrl = (CONTROL_TERM_LINK, pid1, pid2)
             LOG.info("Sending link %s <-> %s", pid1, pid2)
             return self._control_message(ctrl, None)
 
-        elif m[0] == 'unlink':
+        elif m[0] == "unlink":
             (_, pid1, pid2) = m
             ctrl = (CONTROL_TERM_UNLINK, pid1, pid2)
             LOG.info("Sending unlink %s <-> %s", pid1, pid2)
             return self._control_message(ctrl, None)
 
-        elif m[0] == 'unlink_id':
+        elif m[0] == "unlink_id":
             (_, identifier, pid1, pid2) = m
             ctrl = (CONTROL_TERM_UNLINK_ID, identifier, pid1, pid2)
             LOG.info("Sending unlink_id %s -(%s)-> %s", pid1, identifier, pid2)
             return self._control_message(ctrl, None)
 
-        elif m[0] == 'unlink_id_ack':
+        elif m[0] == "unlink_id_ack":
             (_, identifier, pid1, pid2) = m
             ctrl = (CONTROL_TERM_UNLINK_ID_ACK, identifier, pid1, pid2)
             LOG.info("Sending unlink_id_ack %s -(%s)-> %s", pid1, identifier, pid2)
@@ -386,32 +376,30 @@ class BaseDistProtocol(asyncio.Protocol):
 
     @staticmethod
     def _control_term_send(from_pid, dst):
-        """ Creates a control term for dist protocol.
+        """Creates a control term for dist protocol.
 
-            :type from_pid: term.pid.Pid
-            :type dst: term.atom.Atom or term.pid.Pid
+        :type from_pid: term.pid.Pid
+        :type dst: term.atom.Atom or term.pid.Pid
         """
         if isinstance(dst, Atom):
-            return CONTROL_TERM_REG_SEND, from_pid, Atom(''), dst
+            return CONTROL_TERM_REG_SEND, from_pid, Atom(""), dst
         else:
-            return CONTROL_TERM_SEND, Atom(''), dst
+            return CONTROL_TERM_SEND, Atom(""), dst
 
     def _control_message(self, ctrl, msg):
-        """ Pack a control message and a regular message (can be None) together
-            and send them over the connection
+        """Pack a control message and a regular message (can be None) together
+        and send them over the connection
         """
         if msg is None:
-            packet = b'p' + codec.term_to_binary(ctrl)
+            packet = b"p" + codec.term_to_binary(ctrl)
         else:
-            packet = b'p' + codec.term_to_binary(ctrl) + codec.term_to_binary(
-                msg)
+            packet = b"p" + codec.term_to_binary(ctrl) + codec.term_to_binary(msg)
 
         self._send_packet4(packet)
 
     @staticmethod
     def make_digest(challenge: int, cookie: str) -> bytes:
-        result = md5(bytes(cookie, "ascii")
-                     + bytes(str(challenge), "ascii")).digest()
+        result = md5(bytes(cookie, "ascii") + bytes(str(challenge), "ascii")).digest()
         return result
 
     def raise_protocol_error(self, msg):
@@ -420,8 +408,8 @@ class BaseDistProtocol(asyncio.Protocol):
 
     @staticmethod
     def check_digest(digest: bytes, challenge: int, cookie: str) -> bool:
-        """ Hash cookie + the challenge together producing a verification hash
-            and return if they match against the offered 'digest'.
+        """Hash cookie + the challenge together producing a verification hash
+        and return if they match against the offered 'digest'.
         """
         expected_digest = BaseDistProtocol.make_digest(challenge, cookie)
         # LOG("Check digest: expected digest", expected_digest,
@@ -429,17 +417,17 @@ class BaseDistProtocol(asyncio.Protocol):
         return digest == expected_digest
 
     def on_packet_connected(self, data: bytes) -> bytes:
-        """ Handle incoming dist packets in the connected state. """
-        if data == b'':
-            return b''  # this was a keepalive
+        """Handle incoming dist packets in the connected state."""
+        if data == b"":
+            return b""  # this was a keepalive
 
         msg_type = chr(data[0])
 
         if msg_type == "p":
-            LOG.debug(f"message data: {str(data)}")
+            LOG.debug(f"message data: {data!s}")
             (control_term, tail) = codec.binary_to_term(data[1:])
 
-            if tail != b'':
+            if tail != b"":
                 try:
                     (msg_term, tail) = codec.binary_to_term(tail)
                 except codec.PyCodecError:
@@ -453,10 +441,10 @@ class BaseDistProtocol(asyncio.Protocol):
             )
             return tail
 
-        return self.raise_protocol_error("Unexpected dist message type: %s" % msg_type)
+        return self.raise_protocol_error(f"Unexpected dist message type: {msg_type}")
 
     def report_dist_connected(self):
-        assert (self.peer_name_ is not None)
+        assert self.peer_name_ is not None
         LOG.info("Connected to %s", self.peer_name_)
         # self._inform_local_node(('node_connected', self.peer_name_, self))
         n = self.node_db.get(self.node_name_)
@@ -464,4 +452,4 @@ class BaseDistProtocol(asyncio.Protocol):
         n.get_loop().create_task(self.listen_on_inbox())
 
 
-__all__ = ['BaseDistProtocol']
+__all__ = ["BaseDistProtocol"]
