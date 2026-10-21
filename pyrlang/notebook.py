@@ -14,13 +14,13 @@
 from __future__ import annotations
 
 import logging
-from types import ModuleType
-from typing import Callable, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from term.atom import Atom
-from term.basetypes import Term
 from term.pid import Pid
 
+from pyrlang.gen.decorators import CallDecorator
 from pyrlang.gen.decorators import call as main_call
 from pyrlang.gen.server import GenServer
 from pyrlang.util import as_str
@@ -28,7 +28,7 @@ from pyrlang.util import as_str
 LOG = logging.getLogger("pyrlang.notebook")
 
 
-def call(name, msg_len=2):
+def call(name: str, msg_len: int = 2) -> CallDecorator:
     """specific decorator function
 
     Handle the decorator where we expect a tuple of a specific size and
@@ -36,7 +36,7 @@ def call(name, msg_len=2):
     """
     atom = Atom(name)
 
-    def pattern_match(msg):
+    def pattern_match(msg: Any) -> bool:
         if type(msg) != tuple:
             return False
         if len(msg) != msg_len:
@@ -54,13 +54,13 @@ class Notebook(GenServer):
     in subsequent calls.
     """
 
-    def __init__(self, options: dict):
+    def __init__(self, options: dict[str, Any]) -> None:
         super().__init__()
 
-        self.history_ = {}  # type: Dict[Term, Term]
+        self.history_: dict[Any, Any] = {}
         """ Recent calculation results indexed by integers or names. """
 
-        self.history_ids_ = []  # type: List[Term]
+        self.history_ids_: list[Any] = []
         """ Log of recent value ids in their creation order. Values, which were
             deleted because of history size limit, are also deleted here. """
 
@@ -74,7 +74,7 @@ class Notebook(GenServer):
         """
 
     @call("nb_call")
-    def nb_call(self, msg):
+    def nb_call(self, msg: Any) -> tuple[Atom, Any] | tuple[Atom, str, int]:
         """Remote call from ``py.erl``: Calls function defined in ``args``,
         stores the result in history.
 
@@ -101,7 +101,7 @@ class Notebook(GenServer):
         return Atom("ok"), result.__class__.__name__, index
 
     @call("nb_batch", 3)
-    def nb_batch(self, msg) -> tuple[Term, Term, Term]:
+    def nb_batch(self, msg: Any) -> tuple[Atom, Any, Any]:
         """Take a remote call from Erlang to execute batch of Python calls."""
         batch = msg[1]
         param = msg[2]
@@ -116,8 +116,8 @@ class Notebook(GenServer):
             call_ret = bitem[Atom("ret")]
 
             fn = self._resolve_path(call_path)
-            result = fn(*call_args, **call_kwargs) if callable(fn) else None  # type: Term
-            last_result_name = self._store_result_as(result, call_ret)  # type: Term
+            result = fn(*call_args, **call_kwargs) if callable(fn) else None
+            last_result_name = self._store_result_as(result, call_ret)
         result = None
         last_result_name = None
 
@@ -126,7 +126,7 @@ class Notebook(GenServer):
 
         return Atom("ok"), result.__class__.__name__, last_result_name
 
-    def _store_result(self, result):
+    def _store_result(self, result: Any) -> int:
         """Store result as a new numbered value. Trim overflowing values over
         the ``history_limit_``.
         """
@@ -137,7 +137,7 @@ class Notebook(GenServer):
         self._maybe_trim_history()
         return index
 
-    def _store_result_as(self, result: Term, store_key: Term) -> Term:
+    def _store_result_as(self, result: Any, store_key: Any) -> Any:
         """Store result as a new named value. Trim overflowing values over
         the ``history_limit_``.
         """
@@ -147,7 +147,7 @@ class Notebook(GenServer):
         self._maybe_trim_history()
         return store_key
 
-    def _maybe_trim_history(self):
+    def _maybe_trim_history(self) -> None:
         if len(self.history_ids_) <= self.history_limit_:
             return
 
@@ -161,7 +161,7 @@ class Notebook(GenServer):
         del self.history_ids_[0:overflow]
 
     @call("nb_retrieve")
-    def nb_retrieve(self, msg):
+    def nb_retrieve(self, msg: Any) -> tuple[Atom, Any]:
         """Remote call from ``py.erl``: Retrieves a historical value by index."""
         value_id = msg[1]
         if value_id in self.history_:
@@ -169,7 +169,7 @@ class Notebook(GenServer):
 
         return Atom("error"), Atom("not_found")
 
-    def _resolve_path(self, p: list[str]) -> Callable | ModuleType:
+    def _resolve_path(self, p: str | Sequence[Any]) -> Any:
         """Imports p[0] and then follows the list p, by applying getattr()
         repeatedly."""
         if isinstance(p, str):
@@ -192,7 +192,7 @@ class Notebook(GenServer):
 
         return val
 
-    def _retrieve_value(self, pyrlang_val: Sequence[Term]) -> Term:
+    def _retrieve_value(self, pyrlang_val: Sequence[Any]) -> Any:
         k = pyrlang_val[1]
 
         if k not in self.history_:
@@ -202,12 +202,12 @@ class Notebook(GenServer):
 
         return self.history_[k]
 
-    def _resolve_valuerefs_in_args(self, args: list):
+    def _resolve_valuerefs_in_args(self, args: list[Any]) -> list[Any]:
         """For list of args, find pyrlangval references and resolve them from
         the history dict.
         """
 
-        def resolve_arg(pyrlangval_tuple):
+        def resolve_arg(pyrlangval_tuple: Any) -> Any:
             if isinstance(pyrlangval_tuple, tuple) and pyrlangval_tuple[0] == Atom(
                 "$pyrlangval"
             ):
@@ -217,12 +217,12 @@ class Notebook(GenServer):
 
         return list(map(resolve_arg, args))
 
-    def _resolve_valuerefs_in_kwargs(self, dct: dict):
+    def _resolve_valuerefs_in_kwargs(self, dct: dict[str, Any]) -> dict[str, Any]:
         """For a dict of args, find pyrlangval references in dict values and
         resolve them from the history dict.
         """
 
-        def resolve_arg(key_val):
+        def resolve_arg(key_val: tuple[str, Any]) -> tuple[str, Any]:
             key, pyrlangval_tuple = key_val
             if isinstance(pyrlangval_tuple, tuple) and pyrlangval_tuple[0] == Atom(
                 "$pyrlangval"
@@ -234,13 +234,13 @@ class Notebook(GenServer):
         return dict(map(resolve_arg, dct.items()))
 
     @call("exit")
-    def handle_exit_call(self, msg):
+    def handle_exit_call(self, msg: Any) -> Atom:
         reason = msg[1]
         self.exit(reason)
         return Atom("ok")
 
 
-def new_context(options: dict) -> Pid:
+def new_context(options: dict[str, Any]) -> Pid:
     """Create a new remote-call notebook context. Node_name argument will be
     automatically prepended to args by Rex.
     """

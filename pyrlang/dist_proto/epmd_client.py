@@ -24,6 +24,7 @@ import logging
 import socket
 import struct
 import sys
+from typing import TYPE_CHECKING
 
 from term import util
 
@@ -31,6 +32,9 @@ from pyrlang.dist_proto import version
 from pyrlang.errors import EPMDClientError, EPMDConnectionError
 
 LOG = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pyrlang.dist_proto.distribution import ErlangDistribution
 
 NODE_HIDDEN = 77
 NODE_NORMAL = 72
@@ -59,15 +63,17 @@ class EPMDClient(asyncio.Protocol):
         self.port_ = EPMD_DEFAULT_PORT
         """ We expect local EPMD to be available on the default port. """
 
-        self.reader_ = None  # type: Optional[asyncio.StreamReader]
-        self.writer_ = None  # type: Optional[asyncio.StreamWriter]
+        self.reader_: asyncio.StreamReader | None = None
+        self.writer_: asyncio.StreamWriter | None = None
         self.n_connection_attempts_ = 5
 
-    def close(self):
+    def close(self) -> None:
         """Closing EPMD connection removes the node from available EPMD nodes
         list.
         """
         LOG.info("Closing EPMD socket")
+        if self.writer_ is None:
+            raise EPMDClientError("No writer set in close [internal error]")
         self.writer_.close()
 
     async def connect(self) -> bool:
@@ -98,7 +104,7 @@ class EPMDClient(asyncio.Protocol):
         LOG.error("Could not connect to EPMD in %d tries", self.n_connection_attempts_)
         return False
 
-    async def alive2(self, dist) -> bool:
+    async def alive2(self, dist: ErlangDistribution) -> bool:
         """Send initial hello (ALIVE2) to EPMD
 
         :type dist: pyrlang.dist.distribution.ErlangDistribution
@@ -161,8 +167,8 @@ class EPMDClient(asyncio.Protocol):
 
     @staticmethod
     def _make_req_alive2(
-        nodetype: int, name0: str, in_port: int, dist_vsn: tuple, extra0: str
-    ):
+        nodetype: int, name0: str, in_port: int, dist_vsn: tuple[int, int], extra0: str
+    ) -> bytes:
         extra = bytes(extra0, "latin1")
         name = bytes(name0.split("@")[0], "utf8")
 
@@ -182,13 +188,18 @@ class EPMDClient(asyncio.Protocol):
         return msg1 + msg2 + msg3
 
     async def _req_alive2(
-        self, nodetype: int, node_name: str, in_port: int, dist_vsn: tuple, extra: str
-    ):
+        self,
+        nodetype: int,
+        node_name: str,
+        in_port: int,
+        dist_vsn: tuple[int, int],
+        extra: str,
+    ) -> None:
         msg = self._make_req_alive2(nodetype, node_name, in_port, dist_vsn, extra)
         LOG.debug("sending ALIVE2 req n=%s (%s) vsn=%s", node_name, nodetype, dist_vsn)
         await self._req(msg)
 
-    async def _req(self, req: bytes):
+    async def _req(self, req: bytes) -> None:
         """Generic helper function to send a preformatted request to EPMD"""
         header = struct.pack(">H", len(req))
 

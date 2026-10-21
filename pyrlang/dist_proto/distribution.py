@@ -14,6 +14,8 @@
 
 """Distribution class is a separate running Task which owns its TCP connection."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 
@@ -40,12 +42,12 @@ class ErlangDistribution:
             newly connected nodes. 
         """
 
-        self.in_port_ = None  # type: Optional[int]
-        self.in_srv_ = None  # type: Optional[asyncio.AbstractServer]
+        self.in_port_: int | None = None
+        self.in_srv_: asyncio.Server | None = None
         self.epmd_ = EPMDClient()
         self.n_connect_tries_ = 5
 
-    async def start_server(self):
+    async def start_server(self) -> None:
         """Start listening for incoming connections."""
         # Create handler using make_handler_in helper
         # proto_kwargs = {"node_name": node_name}
@@ -74,7 +76,9 @@ class ErlangDistribution:
         e.create_task(self.run_dist_server())
         return res
 
-    async def run_dist_server(self):
+    async def run_dist_server(self) -> None:
+        if self.in_srv_ is None:
+            raise RuntimeError("Distribution server has not been started")
         async with self.in_srv_:
             await self.in_srv_.serve_forever()
 
@@ -86,7 +90,7 @@ class ErlangDistribution:
             self.in_srv_.close()
         self.epmd_.close()
 
-    def destroy(self):
+    def destroy(self) -> None:
         LOG.info("Stopping dist service")
         self.disconnect_epmd()
         del self.epmd_

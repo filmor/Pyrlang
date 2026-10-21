@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Any
 
 from term.atom import Atom
 
@@ -35,7 +36,7 @@ class NetKernel(GenServer):
     @call(
         lambda msg: type(msg) == tuple and len(msg) == 2 and msg[0] == Atom("is_auth")
     )
-    def is_auth(self, msg):
+    def is_auth(self, msg: Any) -> Atom:
         return Atom("yes")
 
 

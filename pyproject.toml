@@ -31,6 +31,7 @@ dev = [
     "ansicolors>=1.1.8",
     "mypy>=1.2",
     "pytest",
+    "ty",
 ]
 
 [tool.pytest.ini_options]
@@ -39,3 +40,9 @@ testpaths = ["test"]
 [tool.setuptools.packages.find]
 include = ["pyrlang", "pyrlang.*"]
 namespaces = false
+
+[tool.setuptools.package-data]
+pyrlang = ["py.typed"]
+
+[tool.ty.src]
+include = ["pyrlang"]

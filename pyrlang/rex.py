@@ -13,6 +13,8 @@
 # limitations under the License.
 import logging
 import traceback
+from collections.abc import Sequence
+from typing import Any
 
 from term.atom import Atom
 
@@ -23,37 +25,37 @@ LOG = logging.getLogger(__name__)
 
 
 class Rex(GenServer):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.get_node().register_name(self, Atom("rex"))
 
     @call(1, lambda msg: True)
-    def handle_call(self, msg):
+    def handle_call(self, msg: Any) -> Any:
         if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom("call"):
             LOG.error("rex unknown call msg: %s", msg)
             return
         return act_on_msg(msg)
 
     @cast(1, lambda msg: True)
-    def handle_cast(self, msg):
+    def handle_cast(self, msg: Any) -> None:
         if type(msg) != tuple or len(msg) != 5 or msg[0] != Atom("cast"):
             LOG.error("rex unknown cast msg: %s", msg)
             return
         act_on_msg(msg)
 
     @info(1, lambda msg: True)
-    def handle_info(self, msg):
+    def handle_info(self, msg: Any) -> None:
         LOG.error("rex unhandled info msg: %s", msg)
 
 
-def act_on_msg(msg):
+def act_on_msg(msg: tuple[Any, ...]) -> Any:
     mod = msg[1]
     fun = msg[2]
     args = msg[3]
     return execute(mod, fun, args)
 
 
-def execute(mod, fun, args, traceback_depth=5):
+def execute(mod: str, fun: str, args: Sequence[Any], traceback_depth: int = 5) -> Any:
     try:
         # we use fromlist so we get the deepest module back
         pmod = __import__(mod, fromlist=["no_use"])
@@ -61,7 +63,7 @@ def execute(mod, fun, args, traceback_depth=5):
         return pfun(*args)
     except Exception as e:
         if traceback_depth > 0:
-            e.traceback = traceback.format_exc(traceback_depth)
+            setattr(e, "traceback", traceback.format_exc(traceback_depth))  # noqa: B010
         LOG.exception(
             "got an exception when executing RPC call %s.%s(*%s)", mod, fun, args
         )

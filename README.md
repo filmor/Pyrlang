@@ -44,6 +44,9 @@ in the project directory. This installs Pyrlang in editable mode, its
 Run Python commands with `uv run python` and tests with `uv run pytest`.
 For a runtime-only environment, use `uv sync --no-dev`.
 
+The library includes type hints; check them with `uv run ty check`.
+Message payloads and remote Python call results remain dynamically typed.
+
 To work on [Term](https://github.com/Pyrlang/Term) alongside Pyrlang, clone it
 and install it into the project environment with `uv pip install -e ../Term`.
 

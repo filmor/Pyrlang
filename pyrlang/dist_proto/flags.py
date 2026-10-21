@@ -126,5 +126,5 @@ class DistributionFlags:
         self.cookie_ = cookie
         self.network_tick_time_ = 60
 
-    def set_node_published(self):
+    def set_node_published(self) -> None:
         self.dflags_ |= DFLAG_PUBLISHED

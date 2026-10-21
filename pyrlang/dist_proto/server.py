@@ -35,10 +35,10 @@ LOG = logging.getLogger(__name__)
 class DistServerProtocol(BaseDistProtocol):
     """Protocol handles incoming connections from other nodes."""
 
-    def __init__(self, node_name: str):
+    def __init__(self, node_name: str) -> None:
         super().__init__(node_name=node_name)
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Exception | None) -> None:
         super().connection_lost(exc)
         self.state_ = self.DISCONNECTED
 
@@ -133,7 +133,7 @@ class DistServerProtocol(BaseDistProtocol):
         LOG.info("Incoming dist established from %s", self.peer_name_)
         return b""  # assume data is consumed
 
-    def _send_challenge(self, my_challenge):
+    def _send_challenge(self, my_challenge: int) -> None:
         if self.dist_vsn_ == 5:
             n = self.get_node()
             LOG.info(
@@ -167,7 +167,7 @@ class DistServerProtocol(BaseDistProtocol):
             )
             self._send_packet2(msg)
 
-    def _send_challenge_ack(self, peers_challenge: int, cookie: str):
+    def _send_challenge_ack(self, peers_challenge: int, cookie: str) -> None:
         """After cookie has been verified, send the confirmation by digesting
         our cookie with the remote challenge
         """

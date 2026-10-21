@@ -18,7 +18,7 @@ import logging
 from term import Atom
 
 
-def start_pyrlang():
+def start_pyrlang() -> None:
     """
     This is invoked on ``import Pyrlang``. Function checks OS environment
     variables documented at :doc:`../configuration`.
@@ -40,7 +40,7 @@ def start_pyrlang():
         logging.basicConfig(format=log_fmt)
 
 
-def as_str(x: bytes | str | Atom):
+def as_str(x: bytes | str | Atom) -> str:
     """Given byte string, or string, or :py:class:`~Pyrlang.Term.atom.Atom`
     extracts a string from it. Bytes are interpreted as ASCII/Latin-1.
 

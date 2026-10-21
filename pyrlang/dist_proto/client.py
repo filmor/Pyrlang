@@ -33,11 +33,11 @@ LOG.setLevel(logging.INFO)
 class DistClientProtocol(BaseDistProtocol):
     """Handles outgoing connections from our to other nodes."""
 
-    def __init__(self, node_name: str, dist_vsn: int):
+    def __init__(self, node_name: str, dist_vsn: int) -> None:
         super().__init__(node_name=node_name)
         self.dist_vsn_ = dist_vsn
 
-    def connection_made(self, transport: asyncio.BaseTransport):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
         self._send_name()
         self.state_ = self.RECV_STATUS
@@ -65,7 +65,7 @@ class DistClientProtocol(BaseDistProtocol):
 
         return self.raise_protocol_error(f"Unknown state for on_packet: {self.state_}")
 
-    def _send_name(self):
+    def _send_name(self) -> None:
         """Create and send first welcome packet."""
 
         if self.dist_vsn_ == 5:
@@ -148,7 +148,7 @@ class DistClientProtocol(BaseDistProtocol):
         else:
             return self.raise_protocol_error("Handshake 'n' or 'N' packet expected")
 
-    def _send_challenge_reply(self, challenge: int):
+    def _send_challenge_reply(self, challenge: int) -> None:
         digest = self.make_digest(challenge, self.get_node().get_cookie())
         self.my_challenge_ = int(random.random() * 0x7FFFFFFF)
 

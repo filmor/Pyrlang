@@ -11,8 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from term import Atom, Pid, Reference
 
@@ -23,6 +26,12 @@ from pyrlang.node_db import NodeDB
 from pyrlang.rex import Rex
 
 LOG = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pyrlang.dist_proto.base_dist_protocol import BaseDistProtocol
+    from pyrlang.process import Process
+
+Receiver: TypeAlias = Pid | Atom | tuple[Atom, Pid | Atom]
 
 
 class Node:
@@ -58,19 +67,19 @@ class Node:
         :param hidden: bool - set to True if you want node to be hidden
             (i.e. not visible in remote ``nodes().``)
         """
-        self.node_name_ = node_name  # type: str
+        self.node_name_ = node_name
         """ Node name as seen on the network. Use full node names here:
             ``name@hostname`` """
 
         self.node_db.register(self)
 
-        self.inbox_ = asyncio.Queue()  # type: asyncio.Queue
+        self.inbox_: asyncio.Queue[tuple[Any, ...]] = asyncio.Queue()
         """ Contains Pyrlang's own messages to the local node. """
 
         self.pid_counter_ = 0
         """ An internal counter used to generate unique process ids """
 
-        self.processes_ = {}  # type: Dict[Pid, Process]
+        self.processes_: dict[Pid, Process] = {}
         """ Process dictionary which stores all the existing ``Process`` objects
             adressable by a pid.
 
@@ -81,7 +90,7 @@ class Node:
                 process.
         """
 
-        self.reg_names_ = {}  # type: Dict[Atom, Pid]
+        self.reg_names_: dict[Atom, Pid] = {}
         """ Registered objects dictionary, which maps atoms to pids
         """
 
@@ -95,9 +104,9 @@ class Node:
         if not hidden:
             self.node_opts_.set_node_published()
 
-        self._signal_wakeups = set()  # type: Set[Pid]
+        self._signal_wakeups: set[Pid] = set()
 
-        self.dist_nodes_ = {}  # type: Dict[str, BaseDistProtocol]
+        self.dist_nodes_: dict[str, BaseDistProtocol] = {}
         self.dist_ = ErlangDistribution(node_name=node_name)
 
         # Spawn and register (automatically) the process 'rex' for remote
@@ -111,11 +120,11 @@ class Node:
         self._event_loop = asyncio.get_event_loop()
         self._event_loop.create_task(self._async_loop())
         # future object we're awaiting when running the loop for the node
-        self.__completed_future = self._event_loop.create_future()
+        self.__completed_future: asyncio.Future[bool] = self._event_loop.create_future()
 
         self._prev_unlink_identifier = -1
 
-    async def _async_loop(self):
+    async def _async_loop(self) -> None:
         # This is important before we can begin spawning processes
         # to get the correct node creation
         await self.dist_.start_distribution()
@@ -125,7 +134,7 @@ class Node:
 
         # LOG.info("Node async_loop ended")
 
-    async def handle_signals(self):
+    async def handle_signals(self) -> None:
         while self._signal_wakeups:
             s_pid = self._signal_wakeups.pop()
             if s_pid not in self.processes_:
@@ -133,15 +142,15 @@ class Node:
                 continue
             await self.processes_[s_pid].handle_signals()
 
-    def signal_wake_up(self, pid):
+    def signal_wake_up(self, pid: Pid) -> None:
         self._signal_wakeups.add(pid)
         self._event_loop.create_task(self.handle_signals())
 
-    def on_exit_process(self, exiting_pid, reason):
+    def on_exit_process(self, exiting_pid: Pid, reason: Any) -> None:
         LOG.info("Process %s exited with %s", exiting_pid, reason)
         del self.processes_[exiting_pid]
 
-    def register_new_process(self, proc=None) -> Pid:
+    def register_new_process(self, proc: Process | None = None) -> Pid:
         """Generate a new pid and add the process to the process dictionary.
 
         :type proc: Process or None
@@ -162,7 +171,7 @@ class Node:
             self.processes_[pid1] = proc
         return pid1
 
-    def register_name(self, proc, name) -> None:
+    def register_name(self, proc: Process, name: Atom) -> None:
         """Add a name into registrations table (automatically removed when the
         referenced process is removed)
 
@@ -173,7 +182,7 @@ class Node:
         """
         self.reg_names_[name] = proc.pid_
 
-    def where_is_process(self, ident):
+    def where_is_process(self, ident: Atom | Pid) -> Process | None:
         """Look up a registered name or pid.
 
         :rtype: pyrlang.process.Process or None
@@ -186,7 +195,7 @@ class Node:
 
         return None
 
-    def where_is(self, ident):
+    def where_is(self, ident: Atom | Pid) -> Pid:
         """Look up a registered name or pid.
 
         :param ident: an Atom or a Pid to convert to a Pid
@@ -201,12 +210,12 @@ class Node:
 
         raise BadArgError(f"where_is argument must be a pid or an atom ({ident})")
 
-    def send_nowait(self, sender, receiver, message) -> None:
+    def send_nowait(self, sender: Pid | None, receiver: Receiver, message: Any) -> None:
         """Create task that sends the message"""
         send_task = self.send(sender, receiver, message)
         self._event_loop.create_task(send_task)
 
-    async def send(self, sender, receiver, message) -> None:
+    async def send(self, sender: Pid | None, receiver: Receiver, message: Any) -> None:
         """Deliver a message to a pid or to a registered name. The pid may be
         located on another Erlang node.
 
@@ -252,7 +261,7 @@ class Node:
 
         raise NodeException(f"Don't know how to send to {receiver}")
 
-    def register_dist_node(self, addr, proto):
+    def register_dist_node(self, addr: str, proto: BaseDistProtocol) -> None:
         """
         add the protocol to dist nodes so that we can use it
         :param addr:
@@ -261,7 +270,7 @@ class Node:
         """
         self.dist_nodes_[addr] = proto
 
-    def unregister_dist_node(self, addr):
+    def unregister_dist_node(self, addr: str | tuple[str, int] | None) -> None:
         """
         remove dist node (disconnected most likley)
         :param addr:
@@ -272,7 +281,7 @@ class Node:
 
         self.dist_nodes_.pop(addr)
 
-    def _send_local_registered(self, receiver, message) -> None:
+    def _send_local_registered(self, receiver: Atom, message: Any) -> None:
         """Try find a named process by atom key, drop a message into its inbox_
 
         :param receiver: A name, atom, of the receiver process
@@ -290,7 +299,7 @@ class Node:
         else:
             LOG.warning("Send to unknown %s ignored", receiver)
 
-    def _send_local(self, receiver, message) -> None:
+    def _send_local(self, receiver: Pid, message: Any) -> None:
         """Try find a process by pid and drop a message into its ``inbox_``.
 
         :param receiver:  Pid who will receive the message
@@ -306,18 +315,20 @@ class Node:
         else:
             LOG.warning("Node._send_local: receiver %s does not exist", receiver)
 
-    async def _send_remote(self, sender, dst_node: str, receiver, message) -> None:
+    async def _send_remote(
+        self, sender: Pid | None, dst_node: str, receiver: Atom | Pid, message: Any
+    ) -> None:
         LOG.debug(f"send_remote to {receiver} <- {message}")
         m = ("send", sender, receiver, message)
         return await self.dist_command(receiver_node=dst_node, message=m)
 
-    def get_cookie(self):
+    def get_cookie(self) -> str:
         """Get string cookie value for this node.
         TODO: Cookie per connection?
         """
         return self.node_opts_.cookie_
 
-    async def dist_command(self, receiver_node: str, message: tuple) -> None:
+    async def dist_command(self, receiver_node: str, message: tuple[Any, ...]) -> None:
         """Locate the connection to the given node (a string).
         Place a tuple crafted by the caller into message box for Erlang
         dist_proto socket. It will pick up and handle the message whenever
@@ -340,7 +351,7 @@ class Node:
         else:
             conn.inbox_.put_nowait(message)
 
-    async def _establish_connection(self, receiver_node):
+    async def _establish_connection(self, receiver_node: str) -> None:
         """Establish a distribution connection to receiver_node."""
 
         if receiver_node not in self.dist_nodes_:
@@ -361,7 +372,7 @@ class Node:
 
             LOG.info("Connected to %s", receiver_node)
 
-    def link_nowait(self, pid1, pid2, local_only=False):
+    def link_nowait(self, pid1: Pid, pid2: Pid, local_only: bool = False) -> None:
         """unsafe casting of link
 
         you can't assume it has got effect when this function returns
@@ -371,7 +382,7 @@ class Node:
         link_task = self.link(pid1, pid2, local_only)
         self._event_loop.create_task(link_task)
 
-    async def link(self, from_pid, to_pid, local_only=False):
+    async def link(self, from_pid: Pid, to_pid: Pid, local_only: bool = False) -> None:
         """Process a link event generated by from_pid, targeting to_pid.
 
         :param from_pid: Source pid
@@ -413,7 +424,9 @@ class Node:
         else:
             LOG.warning("Illegal remote-remote link: %s -> %s", from_pid, to_pid)
 
-    async def unlink(self, from_pid, to_pid, local_only=False):
+    async def unlink(
+        self, from_pid: Pid, to_pid: Pid, local_only: bool = False
+    ) -> None:
         """Mutually unlink two processes.
 
         :param from_pid: First pid
@@ -474,7 +487,7 @@ class Node:
                 to_pid.node_name_, ("unlink_id", identifier, from_pid, to_pid)
             )
 
-    async def _unlink_id(self, identifier, from_pid, to_pid):
+    async def _unlink_id(self, identifier: int, from_pid: Pid, to_pid: Pid) -> None:
         """Services an UNLINK_ID message arriving over distribution.
 
         NOTE: The ERTS manual says: "Upon reception of an UNLINK_ID signal,
@@ -494,7 +507,7 @@ class Node:
             from_pid.node_name_, ("unlink_id_ack", identifier, to_pid, from_pid)
         )
 
-    async def _unlink_id_ack(self, identifier, from_pid, to_pid):
+    async def _unlink_id_ack(self, identifier: int, from_pid: Pid, to_pid: Pid) -> None:
         """Services an UNLINK_ID_ACK message arriving over distribution."""
 
         if to_pid not in self.processes_:
@@ -503,7 +516,9 @@ class Node:
         if to_process._link_state(from_pid) == identifier:
             to_process._set_link_state(from_pid, None)
 
-    def monitor_process(self, origin_pid: Pid, target, ref=None):
+    def monitor_process(
+        self, origin_pid: Pid, target: Pid | Atom, ref: Reference | None = None
+    ) -> Reference:
         """Locate the process referenced by the target and place the origin
         pid into its ``monitors_`` collection. When something happens to the
         ``target``, a special message will be sent to the ``origin``.
@@ -538,7 +553,9 @@ class Node:
         # Target is remote and a dist_proto message has to be sent
         return self._monitor_remote_process(origin_pid, target_pid, m_ref)
 
-    def _monitor_remote_process(self, origin_pid: Pid, target_pid: Pid, ref: Reference):
+    def _monitor_remote_process(
+        self, origin_pid: Pid, target_pid: Pid, ref: Reference
+    ) -> Reference:
         monitor_msg = ("monitor_p", origin_pid, target_pid, ref)
         dc_task = self.dist_command(
             receiver_node=target_pid.node_name_, message=monitor_msg
@@ -549,10 +566,14 @@ class Node:
         # handled by the remote
         assert origin_pid.is_local_to(self)
         origin_p = self.where_is_process(origin_pid)
+        if origin_p is None:
+            raise ProcessNotFoundError(f"Monitor origin {origin_pid} does not exist")
         origin_p.add_monitor(pid=target_pid, ref=ref)
         return ref
 
-    def _monitor_local_process(self, origin_pid: Pid, target_pid: Pid, ref: Reference):
+    def _monitor_local_process(
+        self, origin_pid: Pid, target_pid: Pid, ref: Reference
+    ) -> Reference:
         """Monitor a local target."""
         target_proc = self.processes_.get(target_pid, None)
 
@@ -567,10 +588,16 @@ class Node:
         # Remotely set monitors have remote origin
         if origin_pid.is_local_to(self):
             origin_p = self.where_is_process(origin_pid)
+            if origin_p is None:
+                raise ProcessNotFoundError(
+                    f"Monitor origin {origin_pid} does not exist"
+                )
             origin_p.add_monitor(pid=target_proc.pid_, ref=ref)
         return ref
 
-    async def demonitor_process(self, origin_pid, target, ref):
+    async def demonitor_process(
+        self, origin_pid: Pid, target: Pid | Atom, ref: Reference
+    ) -> None:
         """Locate the process ``target`` and remove the ``origin`` from its
         ``monitors_`` collection. This does not trigger any notifications
         or signals to the ``origin``.
@@ -595,22 +622,24 @@ class Node:
             # Target process is local for this node
             return self._demonitor_local_process(origin_pid, target_pid, ref=ref)
         # Target process is remote, and we need to send monitor message
-        return self._demonitor_remote_process(origin_pid, target_pid, ref=ref)
+        return await self._demonitor_remote_process(origin_pid, target_pid, ref=ref)
 
     async def _demonitor_remote_process(
         self, origin_pid: Pid, target_pid: Pid, ref: Reference
-    ):
+    ) -> None:
         monitor_msg = ("demonitor_p", origin_pid, target_pid, ref)
         await self.dist_command(
             receiver_node=target_pid.node_name_, message=monitor_msg
         )
 
         origin_p = self.where_is_process(origin_pid)
-        origin_p.remove_monitored_by(pid=target_pid, ref=ref)
+        if origin_p is None:
+            raise ProcessNotFoundError(f"Demonitor origin {origin_pid} does not exist")
+        origin_p.remove_monitor(pid=target_pid, ref=ref)
 
     def _demonitor_local_process(
         self, origin_pid: Pid, target_pid: Pid, ref: Reference
-    ):
+    ) -> None:
         target_proc = self.processes_.get(target_pid, None)
         if target_proc is not None:
             target_proc.remove_monitored_by(ref=ref, pid=origin_pid)
@@ -623,9 +652,13 @@ class Node:
         # Remotely set monitors have remote origin
         if origin_pid.is_local_to(self):
             origin_p = self.where_is_process(origin_pid)
+            if origin_p is None:
+                raise ProcessNotFoundError(
+                    f"Demonitor origin {origin_pid} does not exist"
+                )
             origin_p.remove_monitor(ref=ref, pid=target_pid)
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Closes incoming and outgoing connections and destroys the local
         node. This is Python, so some refs from running async handlers
         may remain.
@@ -649,7 +682,7 @@ class Node:
         self.__completed_future.set_result(True)
         del self
 
-    def exit_process(self, sender, receiver, reason):
+    def exit_process(self, sender: Pid, receiver: Pid, reason: Any) -> None:
         """Delivers exit message to a local or remote process."""
 
         exit_task = self._send_exit_signal(
@@ -660,11 +693,15 @@ class Node:
         )
         self._event_loop.create_task(exit_task)
 
-    def send_link_exit_notification(self, sender, receiver, reason):
+    def send_link_exit_notification(
+        self, sender: Pid, receiver: Pid, reason: Any
+    ) -> None:
         link_exit_task = self._send_link_exit_notification(sender, receiver, reason)
         self._event_loop.create_task(link_exit_task)
 
-    async def _send_link_exit_notification(self, sender, receiver, reason):
+    async def _send_link_exit_notification(
+        self, sender: Pid, receiver: Pid, reason: Any
+    ) -> None:
         """Delivers exit message due to a linked process dead to a local
         or remote process."""
         await self._send_exit_signal(
@@ -675,8 +712,12 @@ class Node:
         )
 
     async def _send_exit_signal(
-        self, sender, receiver, reason, dist_protocol_message: str = "exit"
-    ):
+        self,
+        sender: Pid,
+        receiver: Pid,
+        reason: Any,
+        dist_protocol_message: str = "exit",
+    ) -> None:
         """Deliver local or remote exit signal to a process.
 
         :param dist_protocol_message: Defines message which is sent to the
@@ -694,8 +735,8 @@ class Node:
             distm = (dist_protocol_message, sender, receiver, reason)
             await self.dist_command(receiver_node=receiver.node_name_, message=distm)
 
-    def get_loop(self):
+    def get_loop(self) -> asyncio.AbstractEventLoop:
         return self._event_loop
 
-    def run(self):
+    def run(self) -> None:
         self._event_loop.run_until_complete(self.__completed_future)

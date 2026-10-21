@@ -20,16 +20,28 @@ If you need to overrdide for extra functionality you probably want to use
 the classes `CallDecorator`, `CastDecorator`, `InfoDecorator` instead
 """
 
-import asyncio
-import logging
+from __future__ import annotations
 
-from pyrlang.match import Pattern
+import inspect
+import logging
+from collections.abc import Callable, Coroutine
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeAlias, TypeVar, overload
+
+from pyrlang.match import MatchFunction, Pattern
 
 LOG = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from pyrlang.gen.server import GenServer
 
-def async_wrapper_factory(fun):
-    async def async_wrapper(*args, **kwargs):
+P = ParamSpec("P")
+R = TypeVar("R")
+Handler: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
+HandlerMatch: TypeAlias = Callable[[Any], tuple[Handler, Any]]
+
+
+def async_wrapper_factory(fun: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return fun(*args, **kwargs)
 
     return async_wrapper
@@ -40,36 +52,54 @@ class HandleDecorator:
     Base class for handler Decorators, don't use directly
     """
 
-    handler_type = None  # type: Optional[str]
+    handler_type: str | None = None
 
-    def __init__(self, order, pattern=None):
+    def __init__(
+        self, order: int | MatchFunction, pattern: MatchFunction | None = None
+    ) -> None:
         if not pattern:
             import warnings
 
             warnings.warn(DeprecationWarning("you should specify order"))
+            if isinstance(order, int):
+                raise TypeError("handler pattern must be callable")
             pattern = order
             # high but not ensured highest this should be
             # removed soon anyway
             order = 999
 
+        if not isinstance(order, int):
+            raise TypeError("handler order must be an integer")
+        if not callable(pattern):
+            raise TypeError("handler pattern must be callable")
         self.order = order
         self.pattern = pattern
 
-    def __call__(self, fun):
-        if not asyncio.iscoroutinefunction(fun):
+    @overload
+    def __call__(
+        self, fun: Callable[P, Coroutine[Any, Any, R]]
+    ) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+    @overload
+    def __call__(self, fun: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+    def __call__(self, fun: Callable[..., Any]) -> Handler:
+        if not inspect.iscoroutinefunction(fun):
             LOG.debug(
                 "function %s is a handle_%s and is not async", fun, self.handler_type
             )
             fun = async_wrapper_factory(fun)
 
-        fun._gen_handler = self.handler_type
         run_fun = self._pattern_run_fun_factory(fun)
-        fun._gen_pattern = Pattern(self.pattern, run_fun)
-        fun._gen_order = self.order
+        fun.__dict__.update(
+            _gen_handler=self.handler_type,
+            _gen_pattern=Pattern(self.pattern, run_fun),
+            _gen_order=self.order,
+        )
         return fun
 
     @staticmethod
-    def _pattern_run_fun_factory(fun):
+    def _pattern_run_fun_factory(fun: Handler) -> HandlerMatch:
         """
         Factory function for generating the run function of a pattern.
 
@@ -78,7 +108,7 @@ class HandleDecorator:
         :return: function that take msg in and return (fun, msg)
         """
 
-        def _simple_pattern_run_fun(msg):
+        def _simple_pattern_run_fun(msg: Any) -> tuple[Handler, Any]:
             return fun, msg
 
         return _simple_pattern_run_fun
@@ -90,12 +120,12 @@ class CallDecorator(HandleDecorator):
     handle_call matching
     """
 
-    handler_type = "call"  # type: Optional[str]
+    handler_type = "call"
 
     @staticmethod
-    def _pattern_run_fun_factory(fun):
+    def _pattern_run_fun_factory(fun: Handler) -> HandlerMatch:
 
-        async def _handle_reply_wrapper(gs_instance, msg):
+        async def _handle_reply_wrapper(gs_instance: GenServer, msg: Any) -> None:
             """
             wrapper function to strip a Atom('$gen_call') message to
             the actual message, then send a reply
@@ -111,9 +141,11 @@ class CallDecorator(HandleDecorator):
         return lambda msg: (_handle_reply_wrapper, msg)
 
 
-def call(*args, **kwargs):
+def call(
+    order: int | MatchFunction, pattern: MatchFunction | None = None
+) -> CallDecorator:
     """wrapper function around the `CallDecorator` class"""
-    return CallDecorator(*args, **kwargs)
+    return CallDecorator(order, pattern)
 
 
 class CastDecorator(HandleDecorator):
@@ -125,7 +157,7 @@ class CastDecorator(HandleDecorator):
     handler_type = "cast"
 
     @staticmethod
-    def _pattern_run_fun_factory(fun):
+    def _pattern_run_fun_factory(fun: Handler) -> HandlerMatch:
         """
         Factory function for generating the run function of a pattern.
 
@@ -134,7 +166,7 @@ class CastDecorator(HandleDecorator):
         :return: function that take msg in and return (fun, msg)
         """
 
-        def _simple_pattern_run_fun(msg):
+        def _simple_pattern_run_fun(msg: Any) -> tuple[Handler, Any]:
             """
             we strip the Atom('gen_cast') from the message
             :param msg:
@@ -145,9 +177,11 @@ class CastDecorator(HandleDecorator):
         return _simple_pattern_run_fun
 
 
-def cast(*args, **kwargs):
+def cast(
+    order: int | MatchFunction, pattern: MatchFunction | None = None
+) -> CastDecorator:
     """wrapper function around the `CastDecorator` class"""
-    return CastDecorator(*args, **kwargs)
+    return CastDecorator(order, pattern)
 
 
 class InfoDecorator(HandleDecorator):
@@ -159,6 +193,8 @@ class InfoDecorator(HandleDecorator):
     handler_type = "info"
 
 
-def info(*args, **kwargs):
+def info(
+    order: int | MatchFunction, pattern: MatchFunction | None = None
+) -> InfoDecorator:
     """wrapper function around the `InfoDecorator` class"""
-    return InfoDecorator(*args, **kwargs)
+    return InfoDecorator(order, pattern)

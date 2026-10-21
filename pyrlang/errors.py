@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Any
 
 LOG = logging.getLogger("pyrlang")
 
@@ -22,42 +23,42 @@ class PyrlangException(Exception):
 
 
 class NodeException(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("NodeException: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class ProcessNotFoundError(NodeException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("NoProcess: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class BadArgError(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("Bad Argument: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class EPMDClientError(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("EPMD: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class EPMDConnectionError(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("EPMD: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class DistributionError(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("DistributionError: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)
 
 
 class ProcessTimeoutError(PyrlangException):
-    def __init__(self, msg, *args, **kwargs):
+    def __init__(self, msg: str, *args: Any, **kwargs: Any) -> None:
         LOG.error("ProcessTimeoutError: %s", msg)
         Exception.__init__(self, msg, *args, **kwargs)

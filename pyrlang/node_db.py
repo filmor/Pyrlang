@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+import asyncio
+from typing import TYPE_CHECKING, ClassVar, Self
+
+if TYPE_CHECKING:
+    from pyrlang.node import Node
+
+
 class NodeDB:
     """
     A singleton class for keeping track of the nodes that created withing
@@ -9,30 +18,30 @@ class NodeDB:
 
     """
 
-    __singleton = None
+    __singleton: ClassVar[Self | None] = None
 
-    def __new__(cls):
+    def __new__(cls) -> Self:
         if not cls.__singleton:
             cls.__singleton = super().__new__(cls)
         return cls.__singleton
 
-    def __init__(self):
-        self.__db = {}
-        self.__active_node = None
+    def __init__(self) -> None:
+        self.__db: dict[str, Node] = {}
+        self.__active_node: str | None = None
 
-    def _get_key(self, in_data):
-        if type(in_data) == str:
+    def _get_key(self, in_data: str | Node) -> str:
+        if isinstance(in_data, str):
             return in_data
         else:
             return in_data.node_name_
 
-    def get_all(self):
+    def get_all(self) -> dict[str, Node]:
         """
         return the dict of registered nodes
         """
         return self.__db
 
-    def get(self, node_name=None):
+    def get(self, node_name: str | Node | None = None) -> Node:
         """
         Get the active node or the one specified
         """
@@ -45,20 +54,22 @@ class NodeDB:
             raise AttributeError(msg)
         return self.__db[node_name]
 
-    def get_loop(self, node_name=None):
+    def get_loop(
+        self, node_name: str | Node | None = None
+    ) -> asyncio.AbstractEventLoop:
         """
         Get the event loop for the active node, or the one specified
         """
         return self.get(node_name).get_loop()
 
-    def register(self, node):
+    def register(self, node: Node) -> None:
         """
         registers and sets the node as the active one
         """
         self.__db[self._get_key(node)] = node
         self.activate(node)
 
-    def activate(self, node):
+    def activate(self, node: str | Node) -> None:
         """
         set the node as active one.
 
@@ -74,7 +85,7 @@ class NodeDB:
             raise AttributeError(f"node {node} not in database")
         self.__active_node = node_name
 
-    def deactivate(self, node):
+    def deactivate(self, node: str | Node) -> None:
         """
         Remove the node as the active one
 
@@ -86,7 +97,7 @@ class NodeDB:
             raise AttributeError(f"{node} is not the active node")
         self.__active_node = None
 
-    def remove(self, node):
+    def remove(self, node: str | Node) -> None:
         """
         Remove the node from the db
         """
