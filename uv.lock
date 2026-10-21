@@ -792,7 +792,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyrlang-term", git = "https://github.com/Pyrlang/Term.git" }]
+requires-dist = [{ name = "pyrlang-term", git = "https://github.com/filmor/Term.git" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -810,7 +810,7 @@ dev = [
 [[package]]
 name = "pyrlang-term"
 version = "1.5a0"
-source = { git = "https://github.com/Pyrlang/Term.git#bf762693bff43d7ccad15c854aa075f849bd0dbc" }
+source = { git = "https://github.com/filmor/Term.git#90d96b91005f71eb727cafe2fc8372d21cdc432b" }
 
 [[package]]
 name = "pytest"

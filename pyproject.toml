@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
 ]
-dependencies = ["pyrlang-term @ git+https://github.com/Pyrlang/Term.git"]
+dependencies = ["pyrlang-term @ git+https://github.com/filmor/Term.git"]
 
 [project.urls]
 Homepage = "https://github.com/Pyrlang/Pyrlang/"
