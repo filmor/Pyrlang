@@ -9,32 +9,28 @@ If you just want to get going just install pyralng using :code:`pip` the dependa
   pip3 install pyrlang
 
 
-To install pyrlang from source you need to install term manually. Term is an external package
-that pyrlang uses to encode / decode Erlangs
-`external term fomrat <http://erlang .org/doc/apps/erts/erl_ext_dist.html>`__. Install it with:
-
-.. code-block:: console
-
-  pip3 install pyrlang-term
-
-To install Pyrlang you checkout the project and install it:
+To install Pyrlang from source, check out the project and use :code:`uv`.
+The :code:`pyrlang-term` dependency is installed automatically from
+https://github.com/Pyrlang/Term.git:
 
 .. code-block:: console
 
   git clone git@github.com:Pyrlang/Pyrlang.git
   cd Pyrlang
-  pip install .
+  uv sync --no-dev
 
 
 
-To build the docs you need to install Sphinx and some other pacakges you can
-do that with the requirements file:
+To build the docs, install the development dependency group, which includes
+Sphinx and the other documentation tools:
 
 .. code-block:: console
 
-  pip install -r requirements.txt
+  uv sync
 
 Source for the documentation is in the ``docs-src/`` directory. To generate
-HTML, run :code:`make docs` and the ``docs`` directory will be deleted and
-recreated.
+HTML from the project root, run:
 
+.. code-block:: console
+
+  uv run sphinx-build -b html docs-src/source docs

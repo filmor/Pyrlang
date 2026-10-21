@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyrlang"
+version = "0.12a0"
+description = "Erlang Node implemented in Python using asyncio"
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [
+    { name = "Erlang Solutions Ltd", email = "dmytro.lytovchenko@gmail.com" },
+    { name = "S2HC Sweden AB", email = "pyrlang@s2hc.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3.7",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = ["pyrlang-term @ git+https://github.com/Pyrlang/Term.git"]
+
+[project.urls]
+Homepage = "https://github.com/Pyrlang/Pyrlang/"
+
+[dependency-groups]
+dev = [
+    "Jinja2>=2.10.1",
+    "MarkupSafe>=1.0",
+    "Pillow>=4.0.0",
+    "Pygments>=2.2.0",
+    "Sphinx>=1.6.2",
+    "ansicolors>=1.1.8",
+    "mypy>=1.2",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
+[tool.setuptools.packages.find]
+include = ["pyrlang", "pyrlang.*"]
+namespaces = false
